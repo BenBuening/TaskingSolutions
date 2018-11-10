@@ -1,0 +1,50 @@
+﻿Windows Service (task runner and queue - maybe scheduler)
+                - wcf interface
+                                - to query current state & stats
+                                - to enqueue new tasks to run
+ 
+                - queue maintained in database
+                                - scheduled jobs get added to queue instead of started immediately meaning they wont run on top of eachother
+                                - allows resume-where-it-left-off
+                - stats about tasks
+                                - last x runs start/stop timestamps
+                                - current state (queued with position, running, idle)
+                                - previous end state (errored, completed successfully)
+                                                - include exception data?
+                                - could pass in special stat logger object to task, so task can collect more specific stats
+                - job metadata and/or queueing parameters
+                                - ignore if already queued
+                                - how to handle service shutdown request (finish running, abort running)
+                                - parallel options (may not be feasible because of db locking)
+                                                - run solo (for already-parallelized jobs and jobs with lots of db locks)
+                                                - allow multiplexing (for single threaded jobs)
+                                                - preferred number of threads?
+                                - notify on failure
+                                - maximum timespan allowed without running
+                                - priority
+                - with queueing and job stats, it’s possible to implement a rudimentary dashboard showing past jobs and queued jobs
+                - with the stats and queueing and metadata, it's possible to implement alerting system for virtually unlimited scenarios
+               
+                - can be reflective on an interface for job identification. attribute for metadata or part of interface?
+                                - could allow automatic import of new jobs without migration configurations
+                - drop-in pluggable dlls? (may be overengineering)
+                                - file system watcher for new dlls? alternatively, db entries?
+                                                - if file system watcher, dlls would need to contain the initial metadata for the job
+                                                - id db entry, the database would need the metadata
+ 
+               
+               
+Dashboard (poll windows service?)
+                - queries service wcf interface for stats and status          
+                               
+                               
+                               
+ 
+Scheduling Options:
+ 
+                - Roll Our Own Scheduling
+                                -up-sides:
+                                                - we own it and can customize as needed for display on a dashboard
+                                                - we can integrate scheduling into the same dashboard app
+                                - downsides:
+                                                - i've done similar before, and it is complicated and work intensive to set up (this also means error-prone)
