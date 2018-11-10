@@ -7,8 +7,8 @@
     <ProjectGuid>{A9FEFA62-539C-41AF-9A7D-8FAA4AB66D1A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Module</RootNamespace>
-    <AssemblyName>Module</AssemblyName>
+    <RootNamespace>TaskingSolutions.Module</RootNamespace>
+    <AssemblyName>TaskingSolutions.Module</AssemblyName>
     <TargetFrameworkVersion>v4.7</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -49,6 +49,16 @@
     <Compile Include="System Jobs\JobReconciler.cs" />
     <Compile Include="System Jobs\JobRunnerInitializer.cs" />
     <Compile Include="SystemServices.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Data\Data.csproj">
+      <Project>{b15abaa7-01c1-4383-a24c-d609f1f25fe1}</Project>
+      <Name>Data</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Interfaces\Interfaces.csproj">
+      <Project>{cf6f6d53-ab6a-482b-80e3-0aadaae18490}</Project>
+      <Name>Interfaces</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

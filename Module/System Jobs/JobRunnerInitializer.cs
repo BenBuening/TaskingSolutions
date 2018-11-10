@@ -1,4 +1,4 @@
-﻿using JobRunner.Interfaces;
+﻿using TaskingSolutions.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,10 +6,10 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using JobRunner.Data.Accessors;
-using JobRunner.Data.Entities;
+using TaskingSolutions.Data.Accessors;
+using TaskingSolutions.Data.Entities;
 
-namespace JobRunnerModule.System_Jobs
+namespace TaskingSolutions.Module.System_Jobs
 {
     [SystemJob]
     class JobRunnerInitializer : IJob

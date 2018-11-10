@@ -1,8 +1,8 @@
-﻿using JobRunner.Data.Entities;
-using JobRunner.Interfaces;
+﻿using TaskingSolutions.Data.Entities;
+using TaskingSolutions.Interfaces;
 using System.Threading;
 
-namespace JobRunnerModule
+namespace TaskingSolutions.Module
 {
     internal class JobMetadata
     {

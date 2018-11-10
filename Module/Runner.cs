@@ -1,14 +1,14 @@
-﻿using JobRunner.Data.DataAccess;
-using JobRunner.Data.Entities;
-using JobRunner.Interfaces;
-using JobRunnerModule.System_Jobs;
+﻿using TaskingSolutions.Data.DataAccess;
+using TaskingSolutions.Data.Entities;
+using TaskingSolutions.Interfaces;
+using TaskingSolutions.System_Jobs;
 using System;
 using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace JobRunnerModule
+namespace TaskingSolutions.Module
 {
     public class Runner : MarshalByRefObject, IDisposable
     {

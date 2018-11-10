@@ -1,11 +1,11 @@
-﻿using JobRunnerModule;
+﻿using TaskingSolutions.Module;
 using System;
 using System.IO;
 using System.Reflection;
 using System.ServiceProcess;
 using System.Threading;
 
-namespace JobRunner
+namespace TaskingSolutions.Service
 {
     public partial class JobRunnerService : ServiceBase
     {
@@ -120,7 +120,7 @@ namespace JobRunner
             _watcher.Created += _watcher_Changed;
             _watcher.EnableRaisingEvents = true;
 
-            _workerDomain = AppDomain.CreateDomain("JobRunnerDomain");
+            _workerDomain = AppDomain.CreateDomain("TaskingSolutionsDomain");
 
             _runner = (Runner)_workerDomain.CreateInstanceFromAndUnwrap(typeof(Runner).Assembly.Location, typeof(Runner).FullName);
             _runner.Stopped += _runner_Stopped;

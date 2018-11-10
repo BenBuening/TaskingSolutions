@@ -1,8 +1,8 @@
 ﻿using System;
-using JobRunner.Data.Accessors;
-using JobRunner.Interfaces;
+using TaskingSolutions.Data.DataAccess;
+using TaskingSolutions.Interfaces;
 
-namespace JobRunnerModule
+namespace TaskingSolutions.Module
 {
     internal class SystemServices : ISystemServices
     {

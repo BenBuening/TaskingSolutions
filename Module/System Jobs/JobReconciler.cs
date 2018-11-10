@@ -1,13 +1,13 @@
-﻿using JobRunner.Data;
-using JobRunner.Data.DataAccess;
-using JobRunner.Data.Entities;
-using JobRunner.Interfaces;
+﻿using TaskingSolutions.Data;
+using TaskingSolutions.Data.DataAccess;
+using TaskingSolutions.Data.Entities;
+using TaskingSolutions.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace JobRunnerModule.System_Jobs
+namespace TaskingSolutions.Module.System_Jobs
 {
     internal class JobReconciler
     {

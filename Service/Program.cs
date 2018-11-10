@@ -1,6 +1,6 @@
 ﻿using System.ServiceProcess;
 
-namespace JobRunner
+namespace TaskingSolutions.Service
 {
     static class Program
     {
