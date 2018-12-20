@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using TaskingSolutions.Data.Accessors;
+using TaskingSolutions.Data.DataAccess;
 using TaskingSolutions.Data.Entities;
 
 namespace TaskingSolutions.Module.System_Jobs
@@ -37,12 +37,12 @@ namespace TaskingSolutions.Module.System_Jobs
 
 
             // insert job run into db
-            JobRunsAccessor.Insert(new JobRun() { JobId = 0, TriggerTime= DateTime.UtcNow, TimeQueued = DateTime.UtcNow, TimeStarted = DateTime.UtcNow });
+            //new DataAccessFactory().GetJobRunsAccessor().Insert(new JobRun() { JobId = 0, StartTime = DateTime.UtcNow });
 
 
 
 
-            new JobReconciler().Start();
+            //new JobReconciler().Start();
 
 
             // todo: start job. exception handling in job pipeline

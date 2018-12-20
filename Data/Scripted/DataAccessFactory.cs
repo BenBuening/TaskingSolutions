@@ -21,7 +21,8 @@ namespace TaskingSolutions.Data.DataAccess
     public partial interface IDataAccessFactory
     {
 
-        IErorLogsAccessor GetErorLogsAccessor();
+        IDebugLogsAccessor GetDebugLogsAccessor();
+        IErrorLogsAccessor GetErrorLogsAccessor();
         IJobRunsAccessor GetJobRunsAccessor();
         IJobRunStatsAccessor GetJobRunStatsAccessor();
         IJobRunStatTypesAccessor GetJobRunStatTypesAccessor();
@@ -34,9 +35,14 @@ namespace TaskingSolutions.Data.DataAccess
     public partial class DataAccessFactory : IDataAccessFactory
     {
 
-        public IErorLogsAccessor GetErorLogsAccessor()
+        public IDebugLogsAccessor GetDebugLogsAccessor()
         {
-            return new ErorLogsAccessor();
+            return new DebugLogsAccessor();
+        }
+
+        public IErrorLogsAccessor GetErrorLogsAccessor()
+        {
+            return new ErrorLogsAccessor();
         }
 
         public IJobRunsAccessor GetJobRunsAccessor()

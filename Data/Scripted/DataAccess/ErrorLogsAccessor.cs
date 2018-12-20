@@ -19,26 +19,26 @@ namespace TaskingSolutions.Data.DataAccess
      */
 
 
-    public partial interface IJobsAccessor
+    public partial interface IErrorLogsAccessor
     {
 
-        void Insert(Job item);
-        IOutputValueBinder Insert(SqlCommand cmd, Job item);
-        List<Job> GetByPk(int? Id);
-        List<Job> GetByPk(SqlCommand cmd, int? Id);
-        void Update(Job item);
-        void Update(SqlCommand cmd, Job item);
+        void Insert(ErrorLog item);
+        IOutputValueBinder Insert(SqlCommand cmd, ErrorLog item);
+        List<ErrorLog> GetByPk(int? Id);
+        List<ErrorLog> GetByPk(SqlCommand cmd, int? Id);
+        void Update(ErrorLog item);
+        void Update(SqlCommand cmd, ErrorLog item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);
-        void Upsert(Job item);
+        void Upsert(ErrorLog item);
 
     }
 
 
-    internal partial class JobsAccessor : IJobsAccessor
+    internal partial class ErrorLogsAccessor : IErrorLogsAccessor
     {
 
-        public void Insert(Job item)
+        public void Insert(ErrorLog item)
         {
             IOutputValueBinder result;
 
@@ -67,23 +67,18 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public IOutputValueBinder Insert(SqlCommand cmd, Job item)
+        public IOutputValueBinder Insert(SqlCommand cmd, ErrorLog item)
         {
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[Jobs] ([Name], [IsSystemJob], [CanRunConcurrent], [QueueMultipleInstances], [OnShutdown], [JobQueuePriority], [AlertsEmailList], [AlertIfNotRunForXMinutes]) OUTPUT Inserted.[Id] INTO @results VALUES (@Name, @IsSystemJob, @CanRunConcurrent, @QueueMultipleInstances, @OnShutdown, @JobQueuePriority, @AlertsEmailList, @AlertIfNotRunForXMinutes); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[ErrorLogs] ([TimeStamp], [Message], [Exception]) OUTPUT Inserted.[Id] INTO @results VALUES (@TimeStamp, @Message, @Exception); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(SQL.OutputParameter("@Id", SqlDbType.Int));
-            SqlParameter NameParam = cmd.Parameters.Add(SQL.Parameter("@Name", SqlDbType.VarChar, item.Name));
-            SqlParameter IsSystemJobParam = cmd.Parameters.Add(SQL.Parameter("@IsSystemJob", SqlDbType.Bit, item.IsSystemJob));
-            SqlParameter CanRunConcurrentParam = cmd.Parameters.Add(SQL.Parameter("@CanRunConcurrent", SqlDbType.Bit, item.CanRunConcurrent));
-            SqlParameter QueueMultipleInstancesParam = cmd.Parameters.Add(SQL.Parameter("@QueueMultipleInstances", SqlDbType.Bit, item.QueueMultipleInstances));
-            SqlParameter OnShutdownParam = cmd.Parameters.Add(SQL.Parameter("@OnShutdown", SqlDbType.TinyInt, item.OnShutdown));
-            SqlParameter JobQueuePriorityParam = cmd.Parameters.Add(SQL.Parameter("@JobQueuePriority", SqlDbType.TinyInt, (byte)item.JobQueuePriority));
-            SqlParameter AlertsEmailListParam = cmd.Parameters.Add(SQL.Parameter("@AlertsEmailList", SqlDbType.VarChar, item.AlertsEmailList));
-            SqlParameter AlertIfNotRunForXMinutesParam = cmd.Parameters.Add(SQL.Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
+            SqlParameter TimeStampParam = cmd.Parameters.Add(SQL.Parameter("@TimeStamp", SqlDbType.DateTime2, item.TimeStamp));
+            SqlParameter MessageParam = cmd.Parameters.Add(SQL.Parameter("@Message", SqlDbType.VarChar, item.Message));
+            SqlParameter ExceptionParam = cmd.Parameters.Add(SQL.Parameter("@Exception", SqlDbType.VarChar, item.Exception));
 
             cmd.ExecuteNonQuery();
 
@@ -92,9 +87,9 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<Job> GetByPk(int? Id)
+        public List<ErrorLog> GetByPk(int? Id)
         {
-            List<Job> result;
+            List<ErrorLog> result;
 
             using (SqlConnection con = new SqlConnection(SQL.ConStr))
             {
@@ -121,11 +116,11 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<Job> GetByPk(SqlCommand cmd, int? Id)
+        public List<ErrorLog> GetByPk(SqlCommand cmd, int? Id)
         {
-            List<Job> result = new List<Job>();
+            List<ErrorLog> result = new List<ErrorLog>();
 
-            cmd.CommandText = "SELECT * FROM [dbo].[Jobs] WHERE (@Id IS NULL OR [Id] = @Id)";
+            cmd.CommandText = "SELECT * FROM [dbo].[ErrorLogs] WHERE (@Id IS NULL OR [Id] = @Id)";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
@@ -134,29 +129,19 @@ namespace TaskingSolutions.Data.DataAccess
                 if (reader.HasRows)
                 {
                     int IdIndex = reader.GetOrdinal("Id");
-                    int NameIndex = reader.GetOrdinal("Name");
-                    int IsSystemJobIndex = reader.GetOrdinal("IsSystemJob");
-                    int CanRunConcurrentIndex = reader.GetOrdinal("CanRunConcurrent");
-                    int QueueMultipleInstancesIndex = reader.GetOrdinal("QueueMultipleInstances");
-                    int OnShutdownIndex = reader.GetOrdinal("OnShutdown");
-                    int JobQueuePriorityIndex = reader.GetOrdinal("JobQueuePriority");
-                    int AlertsEmailListIndex = reader.GetOrdinal("AlertsEmailList");
-                    int AlertIfNotRunForXMinutesIndex = reader.GetOrdinal("AlertIfNotRunForXMinutes");
+                    int TimeStampIndex = reader.GetOrdinal("TimeStamp");
+                    int MessageIndex = reader.GetOrdinal("Message");
+                    int ExceptionIndex = reader.GetOrdinal("Exception");
 
                     while (reader.Read())
                     {
-                        Job item = new Job();
+                        ErrorLog item = new ErrorLog();
 
                         item.IsNew = false;
                         item.Id = reader.GetInt32(IdIndex);
-                        item.Name = reader.GetString(NameIndex).Trim();
-                        item.IsSystemJob = reader.GetBoolean(IsSystemJobIndex);
-                        item.CanRunConcurrent = reader.GetBoolean(CanRunConcurrentIndex);
-                        item.QueueMultipleInstances = reader.GetBoolean(QueueMultipleInstancesIndex);
-                        item.OnShutdown = reader.GetByte(OnShutdownIndex);
-                        item.JobQueuePriority = (TaskingSolutions.Interfaces.JobQueuePriority)reader.GetByte(JobQueuePriorityIndex);
-                        if (!reader.IsDBNull(AlertsEmailListIndex)) item.AlertsEmailList = reader.GetString(AlertsEmailListIndex).Trim();
-                        if (!reader.IsDBNull(AlertIfNotRunForXMinutesIndex)) item.AlertIfNotRunForXMinutes = reader.GetDecimal(AlertIfNotRunForXMinutesIndex);
+                        item.TimeStamp = reader.GetDateTime(TimeStampIndex);
+                        item.Message = reader.GetString(MessageIndex).Trim();
+                        if (!reader.IsDBNull(ExceptionIndex)) item.Exception = reader.GetString(ExceptionIndex).Trim();
 
                         result.Add(item);
                     }
@@ -165,7 +150,7 @@ namespace TaskingSolutions.Data.DataAccess
                 return result;
             }
 
-        public void Update(Job item)
+        public void Update(ErrorLog item)
         {
             using (SqlConnection con = new SqlConnection(SQL.ConStr))
             {
@@ -190,21 +175,16 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Update(SqlCommand cmd, Job item)
+        public void Update(SqlCommand cmd, ErrorLog item)
         {
-            cmd.CommandText = "UPDATE [dbo].[Jobs] SET [Name] = @Name, [IsSystemJob] = @IsSystemJob, [CanRunConcurrent] = @CanRunConcurrent, [QueueMultipleInstances] = @QueueMultipleInstances, [OnShutdown] = @OnShutdown, [JobQueuePriority] = @JobQueuePriority, [AlertsEmailList] = @AlertsEmailList, [AlertIfNotRunForXMinutes] = @AlertIfNotRunForXMinutes WHERE [Id] = @Id";
+            cmd.CommandText = "UPDATE [dbo].[ErrorLogs] SET [TimeStamp] = @TimeStamp, [Message] = @Message, [Exception] = @Exception WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
             cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, item.Id));
-            cmd.Parameters.Add(SQL.Parameter("@Name", SqlDbType.VarChar, item.Name));
-            cmd.Parameters.Add(SQL.Parameter("@IsSystemJob", SqlDbType.Bit, item.IsSystemJob));
-            cmd.Parameters.Add(SQL.Parameter("@CanRunConcurrent", SqlDbType.Bit, item.CanRunConcurrent));
-            cmd.Parameters.Add(SQL.Parameter("@QueueMultipleInstances", SqlDbType.Bit, item.QueueMultipleInstances));
-            cmd.Parameters.Add(SQL.Parameter("@OnShutdown", SqlDbType.TinyInt, item.OnShutdown));
-            cmd.Parameters.Add(SQL.Parameter("@JobQueuePriority", SqlDbType.TinyInt, (byte)item.JobQueuePriority));
-            cmd.Parameters.Add(SQL.Parameter("@AlertsEmailList", SqlDbType.VarChar, item.AlertsEmailList));
-            cmd.Parameters.Add(SQL.Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
+            cmd.Parameters.Add(SQL.Parameter("@TimeStamp", SqlDbType.DateTime2, item.TimeStamp));
+            cmd.Parameters.Add(SQL.Parameter("@Message", SqlDbType.VarChar, item.Message));
+            cmd.Parameters.Add(SQL.Parameter("@Exception", SqlDbType.VarChar, item.Exception));
 
             cmd.ExecuteNonQuery();
         }
@@ -236,7 +216,7 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Delete(SqlCommand cmd, int Id)
         {
-            cmd.CommandText = "DELETE FROM dbo.Jobs WHERE [Id] = @Id";
+            cmd.CommandText = "DELETE FROM dbo.ErrorLogs WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
@@ -245,7 +225,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.ExecuteNonQuery();
         }
 
-        public void Upsert(Job item)
+        public void Upsert(ErrorLog item)
         {
             IOutputValueBinder result = null;
 

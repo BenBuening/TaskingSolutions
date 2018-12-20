@@ -52,7 +52,7 @@ namespace TaskingSolutions.Service
             catch (Exception ex)
             {
                 // todo: log the exception
-                throw;
+                // todo: throw; -- cannot throw, must recover
             }
         }
 
@@ -74,6 +74,23 @@ namespace TaskingSolutions.Service
                 _runner.Stop();
 
             handle.WaitOne();
+        }
+
+        private static void DirectoryCopy(string source, string dest, bool overwrite, bool copySubDirs)
+        {
+            DirectoryInfo info = new DirectoryInfo(source);
+            if (info.Exists)
+            {
+                if (!Directory.Exists(dest))
+                    Directory.CreateDirectory(dest);
+
+                foreach (FileInfo file in info.GetFiles())
+                    file.CopyTo(Path.Combine(dest, file.Name), overwrite);
+
+                if (copySubDirs)
+                    foreach (DirectoryInfo subdir in info.GetDirectories())
+                        DirectoryCopy(subdir.FullName, Path.Combine(dest, subdir.Name), overwrite, copySubDirs);
+            }
         }
 
         private void _watcher_Changed(object sender, FileSystemEventArgs e)
@@ -100,12 +117,16 @@ namespace TaskingSolutions.Service
 
         protected override void OnStart(string[] args)
         {
+            // todo: what happens if an exception is thrown here? will it kill the service? we can let startup fail
+
+
             string rootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             _workFolder = Path.Combine(rootPath, "WorkBinaries");
             _dropFolder = Path.Combine(rootPath, "DropBinaries");
 
             if (!Directory.Exists(_workFolder)) Directory.CreateDirectory(_workFolder);
             if (!Directory.Exists(_dropFolder)) Directory.CreateDirectory(_dropFolder);
+            DirectoryCopy(_dropFolder, _workFolder, true, true);
 
 
             _watcherWorkTrigger = new Timer(UpdateJobsAssemblies);
@@ -146,6 +167,14 @@ namespace TaskingSolutions.Service
             InitializeComponent();
         }
 
+        public void RunAsConsole(string[] args)
+        {
+            Console.WriteLine("Starting...");
+            OnStart(args);
+            Console.WriteLine("Press any key to exit...");
+            Console.ReadLine();
+            OnStop();
+        }
 
 
 

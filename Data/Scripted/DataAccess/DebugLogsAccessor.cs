@@ -19,26 +19,26 @@ namespace TaskingSolutions.Data.DataAccess
      */
 
 
-    public partial interface IErorLogsAccessor
+    public partial interface IDebugLogsAccessor
     {
 
-        void Insert(ErorLog item);
-        IOutputValueBinder Insert(SqlCommand cmd, ErorLog item);
-        List<ErorLog> GetByPk(int? Id);
-        List<ErorLog> GetByPk(SqlCommand cmd, int? Id);
-        void Update(ErorLog item);
-        void Update(SqlCommand cmd, ErorLog item);
+        void Insert(DebugLog item);
+        IOutputValueBinder Insert(SqlCommand cmd, DebugLog item);
+        List<DebugLog> GetByPk(int? Id);
+        List<DebugLog> GetByPk(SqlCommand cmd, int? Id);
+        void Update(DebugLog item);
+        void Update(SqlCommand cmd, DebugLog item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);
-        void Upsert(ErorLog item);
+        void Upsert(DebugLog item);
 
     }
 
 
-    internal partial class ErorLogsAccessor : IErorLogsAccessor
+    internal partial class DebugLogsAccessor : IDebugLogsAccessor
     {
 
-        public void Insert(ErorLog item)
+        public void Insert(DebugLog item)
         {
             IOutputValueBinder result;
 
@@ -67,18 +67,18 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public IOutputValueBinder Insert(SqlCommand cmd, ErorLog item)
+        public IOutputValueBinder Insert(SqlCommand cmd, DebugLog item)
         {
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[ErorLogs] ([TimeStamp], [Message], [Exception]) OUTPUT Inserted.[Id] INTO @results VALUES (@TimeStamp, @Message, @Exception); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[DebugLogs] ([Timestamp], [Message], [AdditionalData]) OUTPUT Inserted.[Id] INTO @results VALUES (@Timestamp, @Message, @AdditionalData); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(SQL.OutputParameter("@Id", SqlDbType.Int));
-            SqlParameter TimeStampParam = cmd.Parameters.Add(SQL.Parameter("@TimeStamp", SqlDbType.DateTime2, item.TimeStamp));
+            SqlParameter TimestampParam = cmd.Parameters.Add(SQL.Parameter("@Timestamp", SqlDbType.DateTime2, item.Timestamp));
             SqlParameter MessageParam = cmd.Parameters.Add(SQL.Parameter("@Message", SqlDbType.VarChar, item.Message));
-            SqlParameter ExceptionParam = cmd.Parameters.Add(SQL.Parameter("@Exception", SqlDbType.VarChar, item.Exception));
+            SqlParameter AdditionalDataParam = cmd.Parameters.Add(SQL.Parameter("@AdditionalData", SqlDbType.VarChar, item.AdditionalData));
 
             cmd.ExecuteNonQuery();
 
@@ -87,9 +87,9 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<ErorLog> GetByPk(int? Id)
+        public List<DebugLog> GetByPk(int? Id)
         {
-            List<ErorLog> result;
+            List<DebugLog> result;
 
             using (SqlConnection con = new SqlConnection(SQL.ConStr))
             {
@@ -116,11 +116,11 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<ErorLog> GetByPk(SqlCommand cmd, int? Id)
+        public List<DebugLog> GetByPk(SqlCommand cmd, int? Id)
         {
-            List<ErorLog> result = new List<ErorLog>();
+            List<DebugLog> result = new List<DebugLog>();
 
-            cmd.CommandText = "SELECT * FROM [dbo].[ErorLogs] WHERE (@Id IS NULL OR [Id] = @Id)";
+            cmd.CommandText = "SELECT * FROM [dbo].[DebugLogs] WHERE (@Id IS NULL OR [Id] = @Id)";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
@@ -129,19 +129,19 @@ namespace TaskingSolutions.Data.DataAccess
                 if (reader.HasRows)
                 {
                     int IdIndex = reader.GetOrdinal("Id");
-                    int TimeStampIndex = reader.GetOrdinal("TimeStamp");
+                    int TimestampIndex = reader.GetOrdinal("Timestamp");
                     int MessageIndex = reader.GetOrdinal("Message");
-                    int ExceptionIndex = reader.GetOrdinal("Exception");
+                    int AdditionalDataIndex = reader.GetOrdinal("AdditionalData");
 
                     while (reader.Read())
                     {
-                        ErorLog item = new ErorLog();
+                        DebugLog item = new DebugLog();
 
                         item.IsNew = false;
                         item.Id = reader.GetInt32(IdIndex);
-                        item.TimeStamp = reader.GetDateTime(TimeStampIndex);
+                        item.Timestamp = reader.GetDateTime(TimestampIndex);
                         item.Message = reader.GetString(MessageIndex).Trim();
-                        if (!reader.IsDBNull(ExceptionIndex)) item.Exception = reader.GetString(ExceptionIndex).Trim();
+                        item.AdditionalData = reader.GetString(AdditionalDataIndex).Trim();
 
                         result.Add(item);
                     }
@@ -150,7 +150,7 @@ namespace TaskingSolutions.Data.DataAccess
                 return result;
             }
 
-        public void Update(ErorLog item)
+        public void Update(DebugLog item)
         {
             using (SqlConnection con = new SqlConnection(SQL.ConStr))
             {
@@ -175,16 +175,16 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Update(SqlCommand cmd, ErorLog item)
+        public void Update(SqlCommand cmd, DebugLog item)
         {
-            cmd.CommandText = "UPDATE [dbo].[ErorLogs] SET [TimeStamp] = @TimeStamp, [Message] = @Message, [Exception] = @Exception WHERE [Id] = @Id";
+            cmd.CommandText = "UPDATE [dbo].[DebugLogs] SET [Timestamp] = @Timestamp, [Message] = @Message, [AdditionalData] = @AdditionalData WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
             cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, item.Id));
-            cmd.Parameters.Add(SQL.Parameter("@TimeStamp", SqlDbType.DateTime2, item.TimeStamp));
+            cmd.Parameters.Add(SQL.Parameter("@Timestamp", SqlDbType.DateTime2, item.Timestamp));
             cmd.Parameters.Add(SQL.Parameter("@Message", SqlDbType.VarChar, item.Message));
-            cmd.Parameters.Add(SQL.Parameter("@Exception", SqlDbType.VarChar, item.Exception));
+            cmd.Parameters.Add(SQL.Parameter("@AdditionalData", SqlDbType.VarChar, item.AdditionalData));
 
             cmd.ExecuteNonQuery();
         }
@@ -216,7 +216,7 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Delete(SqlCommand cmd, int Id)
         {
-            cmd.CommandText = "DELETE FROM dbo.ErorLogs WHERE [Id] = @Id";
+            cmd.CommandText = "DELETE FROM dbo.DebugLogs WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
@@ -225,7 +225,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.ExecuteNonQuery();
         }
 
-        public void Upsert(ErorLog item)
+        public void Upsert(DebugLog item)
         {
             IOutputValueBinder result = null;
 

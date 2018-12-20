@@ -1,4 +1,4 @@
-﻿namespace JobRunner
+﻿namespace TaskingSolutions.Service
 {
     partial class JobRunnerService
     {

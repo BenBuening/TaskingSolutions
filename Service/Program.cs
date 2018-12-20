@@ -1,17 +1,22 @@
-﻿using System.ServiceProcess;
+﻿using System;
+using System.ServiceProcess;
 
 namespace TaskingSolutions.Service
 {
     static class Program
     {
-        static void Main()
+        static void Main(string[] args)
         {
-            ServiceBase[] ServicesToRun;
-            ServicesToRun = new ServiceBase[]
+            JobRunnerService service = new JobRunnerService();
+            if (Environment.UserInteractive)
+                service.RunAsConsole(args);
+
+            else
             {
-                new JobRunnerService()
-            };
-            ServiceBase.Run(ServicesToRun);
+                ServiceBase[] ServicesToRun;
+                ServicesToRun = new ServiceBase[] { service };
+                ServiceBase.Run(ServicesToRun);
+            }
         }
     }
 }

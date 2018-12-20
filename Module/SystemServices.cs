@@ -31,8 +31,8 @@ namespace TaskingSolutions.Module
 
         public void LogStat(string key, string value)
         {
-            if (_jobRunId != 0 && key != null && value != null)
-                JobRunStatsAccessor.Insert(_jobRunId, key, value);
+            //if (_jobRunId != 0 && key != null && value != null)
+            //    JobRunStatsAccessor.Insert(_jobRunId, key, value);
         }
 
     }

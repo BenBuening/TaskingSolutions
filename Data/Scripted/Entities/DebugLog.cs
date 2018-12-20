@@ -15,11 +15,11 @@ namespace TaskingSolutions.Data.Entities
      */
 
 
-    public partial class ErorLog : EntityBase
+    public partial class DebugLog : EntityBase
     {
         public int Id { get; set; }
-        public DateTime TimeStamp { get; set; }
+        public DateTime Timestamp { get; set; }
         public string Message { get; set; }
-        public string Exception { get; set; }
+        public string AdditionalData { get; set; }
     }
 }

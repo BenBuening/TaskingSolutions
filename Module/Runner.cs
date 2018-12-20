@@ -1,7 +1,7 @@
 ﻿using TaskingSolutions.Data.DataAccess;
 using TaskingSolutions.Data.Entities;
 using TaskingSolutions.Interfaces;
-using TaskingSolutions.System_Jobs;
+using TaskingSolutions.Module.System_Jobs;
 using System;
 using System.IO;
 using System.Reflection;
@@ -77,7 +77,7 @@ namespace TaskingSolutions.Module
                 }
                 catch (Exception ex)
                 {
-                    ErrorLogsAccessor.Insert(ex);
+                    _dataAccess.GetErrorLogsAccessor().LogException(ex);
                     Stop();
                 }
             }
