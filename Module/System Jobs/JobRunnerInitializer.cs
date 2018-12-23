@@ -30,24 +30,13 @@ namespace TaskingSolutions.Module.System_Jobs
             * 
             * */
 
-
+            List<Assembly> loadedAssemblies = new List<Assembly>();
             foreach (var filePath in Directory.EnumerateFiles(this.WorkFolderPath, "*.dll", SearchOption.TopDirectoryOnly))
                 if (Path.GetFileName(filePath) != "JobRunnerInterfaces.dll")
                     Assembly.LoadFile(filePath);
 
-
-            // insert job run into db
-            //new DataAccessFactory().GetJobRunsAccessor().Insert(new JobRun() { JobId = 0, StartTime = DateTime.UtcNow });
-
-
-
-
-            //new JobReconciler().Start();
-
-
-            // todo: start job. exception handling in job pipeline
-            //  start job
-            // when exception... option to send email...
+            new JobReconciler().Start();
         }
+
     }
 }

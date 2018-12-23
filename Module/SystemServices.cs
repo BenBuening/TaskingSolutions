@@ -1,5 +1,6 @@
 ﻿using System;
 using TaskingSolutions.Data.DataAccess;
+using TaskingSolutions.Data.Entities;
 using TaskingSolutions.Interfaces;
 
 namespace TaskingSolutions.Module
@@ -7,32 +8,52 @@ namespace TaskingSolutions.Module
     internal class SystemServices : ISystemServices
     {
 
-        private int _jobRunId;
+        private IDataAccessFactory _dataAccess;
+        private readonly int _jobRunId;
         
-        public SystemServices(int jobRunId)
+        public SystemServices(IDataAccessFactory dataAccess, int jobRunId)
         {
+            _dataAccess = dataAccess;
             _jobRunId = jobRunId;
         }
 
         public void LogError(string message)
         {
-            throw new NotImplementedException();
+            try
+            {
+                _dataAccess.GetErrorLogsAccessor().Insert(new ErrorLog() { Message = message });
+            }
+            catch { }
         }
 
         public void LogError(Exception ex)
         {
-            throw new NotImplementedException();
+            try
+            {
+                _dataAccess.GetErrorLogsAccessor().Insert(new ErrorLog() { Exception = ex.ToString() });
+            }
+            catch { }
         }
 
         public void LogError(Exception ex, string additionalComment)
         {
-            throw new NotImplementedException();
+            try
+            {
+                _dataAccess.GetErrorLogsAccessor().Insert(new ErrorLog() { Exception = ex.ToString(), Message = additionalComment });
+            }
+            catch { }
         }
 
         public void LogStat(string key, string value)
         {
-            //if (_jobRunId != 0 && key != null && value != null)
-            //    JobRunStatsAccessor.Insert(_jobRunId, key, value);
+            try
+            {
+                _dataAccess.GetJobRunStatsAccessor().Insert(_jobRunId, key, value);
+            }
+            catch (Exception ex)
+            {
+                LogError(ex, "Error trying to log a stat");
+            }
         }
 
     }

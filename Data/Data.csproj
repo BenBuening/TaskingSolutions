@@ -41,6 +41,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataAccess\JobRunStatsAccessor.cs" />
+    <Compile Include="DataAccess\JobSchedulesAccessor.cs" />
+    <Compile Include="DataAccess\JobsAccessor.cs" />
     <Compile Include="DataAccess\ErrorLogsAccessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RecurranceType.cs" />

@@ -3,7 +3,8 @@
 namespace TaskingSolutions.Interfaces
 {
     /// <summary>
-    /// Specify the name of the job. If this attribute is not used, the IJob-implementing class's name will be used for the job's name.
+    /// Specify the friendly name of the job. This is the name that will be shown in the Tasking Solutions dashboard.
+    ///     If this attribute is not used, the class's name will be used for the job's name.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class JobNameAttribute : Attribute

@@ -7,17 +7,20 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using TaskingSolutions.Logging;
 
 namespace TaskingSolutions.Module
 {
     public class Runner : MarshalByRefObject, IDisposable
     {
 
-        private const int _timerPollingInterval = 1000 * 60;
+        private const int _timerPollingInterval = 1000 * 60; // 60 seconds
 
+        private Logger _logger;
         private Timer _checkJobsTimer;
         private DataAccessFactory _dataAccess;
-
+        private EventWaitHandle _initGate;
+        
 
 
         private Job SystemJob(string name)
@@ -33,6 +36,7 @@ namespace TaskingSolutions.Module
 
         private void CheckJobsTimerTick(object state)
         {
+            _logger.LogDebug("Runner.CheckJobsTimerTick - enter");
             if (_checkJobsTimer != null)
             {
                 _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
@@ -43,10 +47,22 @@ namespace TaskingSolutions.Module
 
                 // check db for next job to start. consider priority, threadedness, trigger time
 
+                
+                // query job schedules for schedules with next trigger date <= now
+                // examine priority and multi-thread flags
+                // start any that can be started concurrently - if all running can be concurrent
+                // if not concurrent, then wait until all are finished before starting
 
+
+                // any time check if tasks are running, remove completed tasks. probably doenst matter the timeline as task.waitall will count finished tasks immediately
+
+
+                
+                
 
                 _checkJobsTimer.Change(_timerPollingInterval, Timeout.Infinite);
             }
+            _logger.LogDebug("Runner.CheckJobsTimerTick - exit");
         }
 
 
@@ -58,35 +74,44 @@ namespace TaskingSolutions.Module
 
         public Runner()
         {
+            _logger = new Logger(@"c:\_temp\JobRunnerModuleLog.txt");
             _dataAccess = new DataAccessFactory();
             _checkJobsTimer = new Timer(CheckJobsTimerTick, null, Timeout.Infinite, Timeout.Infinite);
+            _initGate = new EventWaitHandle(false, EventResetMode.ManualReset);
         }
 
         public void Start(string workFolderPath)
         {
+            _logger.LogDebug("Runner.Start - enter");
             void init()
             {
+                _logger.LogDebug("Runner.Start.init - enter");
                 try
                 {
                     JobRunnerInitializer initializer = new JobRunnerInitializer();
                     initializer.WorkFolderPath = workFolderPath;
                     initializer.Start(null);
 
-                    // initializer
+                    _initGate.Set();
                     _checkJobsTimer.Change(0, Timeout.Infinite);
+                    _logger.LogDebug("Runner.Start.init - exit");
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError("Runner.Start.init - error", ex);
                     _dataAccess.GetErrorLogsAccessor().LogException(ex);
                     Stop();
                 }
             }
 
             new Task(init).Start();
+            _logger.LogDebug("Runner.Start - exit");
         }
 
         public void Stop()
         {
+            _initGate.WaitOne();
+
             _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
             _checkJobsTimer = null;
 
@@ -100,6 +125,8 @@ namespace TaskingSolutions.Module
 
         public void ShutDown()
         {
+            _initGate.WaitOne();
+
             // call same logic as stop, but with shorter wait time
         }
 
@@ -108,9 +135,54 @@ namespace TaskingSolutions.Module
             // same logic as stop
         }
 
-        public void StopAfterCurrentJob()
+        public void StopAfterCurrentJobsFinish()
         {
+            _initGate.WaitOne();
+            //Task.WaitAll()
 
+            _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            _checkJobsTimer = null;
+
+
+            // check running job metadata for stop action (wait or abort)
+            //  use previous job data to deterimine if too long running for wait
+
+            this.Stopped?.Invoke(null, EventArgs.Empty);
+        }
+
+
+        private void StartJob(IJob job)
+        {
+            // track job somehow?
+            var t = Task.Factory.StartNew(StartJobThreaded, job);
+            // set continuation to stop tracking job?
+        }
+
+        void StartJobThreaded(object input)
+        {
+            // create job run?
+
+            //_dataAccess.GetJobRunsAccessor();
+
+
+            JobMetadata data = (JobMetadata)input;
+            ISystemServices statCollector = new SystemServices(_dataAccess, data.JobRun.Id);
+            try
+            {
+                data.Job.Start(statCollector);
+            }
+            catch (Exception ex)
+            {
+                statCollector.LogError(ex);
+            }
+
+        }
+
+
+        private class JobMetadata
+        {
+            public IJob Job { get; set; }
+            public JobRun JobRun { get; set; }
         }
 
 

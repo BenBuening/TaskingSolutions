@@ -1,17 +1,20 @@
-﻿using TaskingSolutions.Module;
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
 using System.ServiceProcess;
 using System.Threading;
+using System.Threading.Tasks;
+using TaskingSolutions.Logging;
+using TaskingSolutions.Module;
 
 namespace TaskingSolutions.Service
 {
     public partial class JobRunnerService : ServiceBase
     {
 
-        private const int _watcherWorkWaitInterval = 1000 * 10;
+        private const int _watcherWorkWaitInterval = 1000 * 10; // 10 seconds
 
+        private Logger _logger;
         private string _dropFolder;
         private string _workFolder;
         private FileSystemWatcher _watcher;
@@ -24,24 +27,27 @@ namespace TaskingSolutions.Service
 
         private void UpdateJobsAssemblies(object state)
         {
-            _watcher.EnableRaisingEvents = false;
-            _watcherWorkTrigger.Change(Timeout.Infinite, Timeout.Infinite);
-            _watcherWorkTrigger.Dispose();
-            _watcher.Dispose();
-            _watcherWorkTrigger = null;
-            _watcher = null;
-
-
-            EventWaitHandle handle = new EventWaitHandle(false, EventResetMode.ManualReset);
-            _onStoppedFollowup = () => { _onStoppedFollowup = null; handle.Set(); };
-
-            _runner.StopAfterCurrentJob();
-
-            handle.WaitOne();
-
-            // clear out the working folder and copy over the contents of the drop folder
+            _logger.LogDebug("JobRunnerService.UpdateJobsAssemblies - enter");
             try
             {
+                _watcher.EnableRaisingEvents = false;
+                _watcherWorkTrigger.Change(Timeout.Infinite, Timeout.Infinite);
+                _watcherWorkTrigger.Dispose();
+                _watcher.Dispose();
+                _watcherWorkTrigger = null;
+                _watcher = null;
+
+
+                EventWaitHandle handle = new EventWaitHandle(false, EventResetMode.ManualReset);
+                _onStoppedFollowup = () => { _onStoppedFollowup = null; handle.Set(); };
+
+                _runner.StopAfterCurrentJobsFinish();
+
+                _logger.LogDebug("JobRunnerService.UpdateJobsAssemblies - begin wait for stop");
+                handle.WaitOne();
+                _logger.LogDebug("JobRunnerService.UpdateJobsAssemblies - end wait for stop");
+
+                // clear out the working folder and copy over the contents of the drop folder
                 foreach (var file in new DirectoryInfo(_workFolder).GetFiles())
                     file.Delete();
                 foreach (var filePath in Directory.GetFiles(_dropFolder))
@@ -51,9 +57,10 @@ namespace TaskingSolutions.Service
             }
             catch (Exception ex)
             {
-                // todo: log the exception
-                // todo: throw; -- cannot throw, must recover
+                _logger.LogError(ex);
+                Stop();
             }
+            _logger.LogDebug("JobRunnerService.UpdateJobsAssemblies - exit");
         }
 
         private void Stop(bool isShutDown)
@@ -95,12 +102,13 @@ namespace TaskingSolutions.Service
 
         private void _watcher_Changed(object sender, FileSystemEventArgs e)
         {
+            _logger.LogDebug("JobRunnerService._watcher_Changed");
             _watcherWorkTrigger.Change(_watcherWorkWaitInterval, Timeout.Infinite);
         }
 
         private void _watcher_Error(object sender, ErrorEventArgs e)
         {
-            // todo: log error
+            _logger.LogError("JobRunnerService._watcher_Error", e.GetException());
             _watcher.EnableRaisingEvents = false;
             _watcher.Dispose();
             _watcher = null;
@@ -108,54 +116,88 @@ namespace TaskingSolutions.Service
 
         private void _runner_Stopped(object sender, EventArgs e)
         {
-            _runner.Stopped -= _runner_Stopped;
-            _runner = null;
-            AppDomain.Unload(_workerDomain);
-            _onStoppedFollowup?.Invoke();
+            void RunnerStopped()
+            {
+                _logger.LogDebug("JobRunnerService._runner_Stopped - enter");
+                _runner.Stopped -= _runner_Stopped;
+                _runner = null;
+                AppDomain.Unload(_workerDomain);
+                _onStoppedFollowup?.Invoke();
+                _logger.LogDebug("JobRunnerService._runner_Stopped - exit");
+            }
+
+            Task.Factory.StartNew(RunnerStopped);
         }
 
 
         protected override void OnStart(string[] args)
         {
-            // todo: what happens if an exception is thrown here? will it kill the service? we can let startup fail
+            _logger.LogDebug("JobRunnerService.OnStart - enter");
+            try
+            {
+                string rootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                _workFolder = Path.Combine(rootPath, "WorkBinaries");
+                _dropFolder = Path.Combine(rootPath, "DropBinaries");
+
+                if (!Directory.Exists(_workFolder)) Directory.CreateDirectory(_workFolder);
+                if (!Directory.Exists(_dropFolder)) Directory.CreateDirectory(_dropFolder);
+                DirectoryCopy(_dropFolder, _workFolder, true, true);
 
 
-            string rootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            _workFolder = Path.Combine(rootPath, "WorkBinaries");
-            _dropFolder = Path.Combine(rootPath, "DropBinaries");
+                _watcherWorkTrigger = new Timer(UpdateJobsAssemblies);
 
-            if (!Directory.Exists(_workFolder)) Directory.CreateDirectory(_workFolder);
-            if (!Directory.Exists(_dropFolder)) Directory.CreateDirectory(_dropFolder);
-            DirectoryCopy(_dropFolder, _workFolder, true, true);
+                _watcher = new FileSystemWatcher();
+                _watcher.Path = _dropFolder;
+                _watcher.NotifyFilter = (NotifyFilters)383; // all
+                _watcher.Filter = "*.dll";
+                _watcher.Error += _watcher_Error;
+                _watcher.Changed += _watcher_Changed;
+                _watcher.Deleted += _watcher_Changed;
+                _watcher.Created += _watcher_Changed;
+                _watcher.EnableRaisingEvents = true;
 
+                _workerDomain = AppDomain.CreateDomain("TaskingSolutionsDomain");
 
-            _watcherWorkTrigger = new Timer(UpdateJobsAssemblies);
-
-            _watcher = new FileSystemWatcher();
-            _watcher.Path = _dropFolder;
-            _watcher.NotifyFilter = (NotifyFilters)383; // all
-            _watcher.Filter = "*.dll";
-            _watcher.Error += _watcher_Error;
-            _watcher.Changed += _watcher_Changed;
-            _watcher.Deleted += _watcher_Changed;
-            _watcher.Created += _watcher_Changed;
-            _watcher.EnableRaisingEvents = true;
-
-            _workerDomain = AppDomain.CreateDomain("TaskingSolutionsDomain");
-
-            _runner = (Runner)_workerDomain.CreateInstanceFromAndUnwrap(typeof(Runner).Assembly.Location, typeof(Runner).FullName);
-            _runner.Stopped += _runner_Stopped;
-            _runner.Start(_workFolder);
+                _runner = (Runner)_workerDomain.CreateInstanceFromAndUnwrap(typeof(Runner).Assembly.Location, typeof(Runner).FullName);
+                _runner.Stopped += _runner_Stopped;
+                _runner.Start(_workFolder);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("JobRunnerService.OnStart - exception", ex);
+                throw;
+            }
+            _logger.LogDebug("JobRunnerService.OnStart - exit");
         }
 
         protected override void OnStop()
         {
-            Stop(false);
+            _logger.LogDebug("JobRunnerService.OnStop - enter");
+            try
+            {
+                Stop(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("JobRunnerService.OnStop - exception", ex);
+                throw;
+            }
+            _logger.LogDebug("JobRunnerService.OnStop - exit");
         }
 
         protected override void OnShutdown()
         {
-            Stop(true);
+            _logger.LogDebug("JobRunnerService.OnShutdown - enter");
+            try
+            {
+                Stop(true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("JobRunnerService.OnShutdown - exception", ex);
+                throw;
+            }
+            _logger.LogDebug("JobRunnerService.OnShutdown - exit");
         }
 
 
@@ -165,6 +207,7 @@ namespace TaskingSolutions.Service
         public JobRunnerService()
         {
             InitializeComponent();
+            _logger = new Logger(@"c:\_temp\JobRunnerServiceLog.txt");
         }
 
         public void RunAsConsole(string[] args)

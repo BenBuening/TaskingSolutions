@@ -26,5 +26,7 @@ namespace TaskingSolutions.Data.Entities
         public TaskingSolutions.Interfaces.JobQueuePriority JobQueuePriority { get; set; }
         public string AlertsEmailList { get; set; }
         public decimal? AlertIfNotRunForXMinutes { get; set; }
+        public string DotNetType { get; set; }
+        public bool IsDotNetTypeMissing { get; set; }
     }
 }
