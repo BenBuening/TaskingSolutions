@@ -14,7 +14,7 @@ namespace TaskingSolutions.Service
 
         private const int _watcherWorkWaitInterval = 1000 * 10; // 10 seconds
 
-        private Logger _logger;
+        private FileLogger _logger;
         private string _dropFolder;
         private string _workFolder;
         private FileSystemWatcher _watcher;
@@ -207,7 +207,7 @@ namespace TaskingSolutions.Service
         public JobRunnerService()
         {
             InitializeComponent();
-            _logger = new Logger(@"c:\_temp\JobRunnerServiceLog.txt");
+            _logger = new FileLogger(@"c:\_temp\JobRunnerServiceLog.txt");
         }
 
         public void RunAsConsole(string[] args)
@@ -215,8 +215,8 @@ namespace TaskingSolutions.Service
             Console.WriteLine("Starting...");
             OnStart(args);
             Console.WriteLine("Press any key to exit...");
-            Console.ReadLine();
-            OnStop();
+            var result = Console.ReadKey();
+            Stop(false);
         }
 
 

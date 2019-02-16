@@ -122,7 +122,7 @@ namespace TaskingSolutions.Module.System_Jobs
         public void Start()
         {
             var diskJobs = GetJobsFromLoadedAssemblies();
-            var jobs = _jobsAccessor.GetByPk(null).ToDictionary(x => x.DotNetType);
+            var jobs = _jobsAccessor.GetAll().ToDictionary(x => x.DotNetType);
 
             foreach (var jobInfo in diskJobs)
             {

@@ -18,7 +18,7 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Insert(int jobRunId, string key, string value)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -56,9 +56,9 @@ insert into [dbo].[JobRunStats] ([JobRunId], [JobRunStatTypeId], [Value]) values
 ";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            SqlParameter JobRunIdParam = cmd.Parameters.Add(SQL.Parameter("@JobRunId", SqlDbType.Int, jobRunId));
-            SqlParameter DescriptionParam = cmd.Parameters.Add(SQL.Parameter("@Description", SqlDbType.VarChar, key));
-            SqlParameter ValueParam = cmd.Parameters.Add(SQL.Parameter("@Value", SqlDbType.VarChar, value));
+            SqlParameter JobRunIdParam = cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.Int, jobRunId));
+            SqlParameter DescriptionParam = cmd.Parameters.Add(Parameter("@Description", SqlDbType.VarChar, key));
+            SqlParameter ValueParam = cmd.Parameters.Add(Parameter("@Value", SqlDbType.VarChar, value));
 
             cmd.ExecuteNonQuery();
 

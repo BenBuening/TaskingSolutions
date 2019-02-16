@@ -18,7 +18,7 @@ namespace TaskingSolutions.Data.DataAccess
         {
             List<IOutputValueBinder> results = new List<IOutputValueBinder>(schedules.Count + 1);
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -28,9 +28,14 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        results.Add(Insert(cmd, job));
+                        var binder = Insert(cmd, job);
+                        results.Add(binder);
 
-                        results.AddRange(new JobSchedulesAccessor().Insert(cmd, schedules));
+                        int insertedId = (int)binder.PeekAtBoundValue(nameof(job.Id));
+                        foreach (var schedule in schedules)
+                            schedule.JobId = insertedId;
+
+                        results.AddRange(new JobSchedulesAccessor(this.ConnectionString).Insert(cmd, schedules));
                     }
 
                     txn.Commit();

@@ -23,9 +23,12 @@ namespace TaskingSolutions.Data.DataAccess
     {
 
         void Insert(JobRunStat item);
+        void Insert(List<JobRunStat> items);
         IOutputValueBinder Insert(SqlCommand cmd, JobRunStat item);
-        List<JobRunStat> GetByPk(int? Id);
-        List<JobRunStat> GetByPk(SqlCommand cmd, int? Id);
+        List<JobRunStat> GetAll();
+        List<JobRunStat> GetAll(SqlCommand cmd);
+        JobRunStat GetByPk(int Id);
+        JobRunStat GetByPk(SqlCommand cmd, int Id);
         void Update(JobRunStat item);
         void Update(SqlCommand cmd, JobRunStat item);
         void Delete(int Id);
@@ -35,14 +38,28 @@ namespace TaskingSolutions.Data.DataAccess
     }
 
 
-    internal partial class JobRunStatsAccessor : IJobRunStatsAccessor
+    internal partial class JobRunStatsAccessor : AccessorBase, IJobRunStatsAccessor
     {
+
+        public JobRunStatsAccessor(string connectionString) : base(connectionString) { }
+
 
         public void Insert(JobRunStat item)
         {
-            IOutputValueBinder result;
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    Insert(cmd, item).Commit();
+            }
+        }
+
+        public void Insert(List<JobRunStat> items)
+        {
+            List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
+
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -52,7 +69,9 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        result = Insert(cmd, item);
+
+                        foreach (var item in items)
+                            results.Add(Insert(cmd, item));
                     }
 
                     txn.Commit();
@@ -63,7 +82,8 @@ namespace TaskingSolutions.Data.DataAccess
                     throw;
                 }
 
-                result.Commit();
+                foreach (var result in results)
+                    result.Commit();
             }
         }
 
@@ -75,10 +95,10 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[JobRunStats] ([JobRunId], [JobRunStatTypeId], [Value]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobRunId, @JobRunStatTypeId, @Value); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            SqlParameter IdParam = cmd.Parameters.Add(SQL.OutputParameter("@Id", SqlDbType.Int));
-            SqlParameter JobRunIdParam = cmd.Parameters.Add(SQL.Parameter("@JobRunId", SqlDbType.Int, item.JobRunId));
-            SqlParameter JobRunStatTypeIdParam = cmd.Parameters.Add(SQL.Parameter("@JobRunStatTypeId", SqlDbType.Int, item.JobRunStatTypeId));
-            SqlParameter ValueParam = cmd.Parameters.Add(SQL.Parameter("@Value", SqlDbType.VarChar, item.Value));
+            SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
+            SqlParameter JobRunIdParam = cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.Int, item.JobRunId));
+            SqlParameter JobRunStatTypeIdParam = cmd.Parameters.Add(Parameter("@JobRunStatTypeId", SqlDbType.Int, item.JobRunStatTypeId));
+            SqlParameter ValueParam = cmd.Parameters.Add(Parameter("@Value", SqlDbType.VarChar, item.Value));
 
             cmd.ExecuteNonQuery();
 
@@ -87,72 +107,94 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<JobRunStat> GetByPk(int? Id)
+        protected List<JobRunStat> ReadRecords(SqlDataReader reader)
         {
-            List<JobRunStat> result;
+            List<JobRunStat> result = new List<JobRunStat>();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            if (reader.HasRows)
             {
-                con.Open();
-                SqlTransaction txn = con.BeginTransaction();
+                int IdIndex = reader.GetOrdinal("Id");
+                int JobRunIdIndex = reader.GetOrdinal("JobRunId");
+                int JobRunStatTypeIdIndex = reader.GetOrdinal("JobRunStatTypeId");
+                int ValueIndex = reader.GetOrdinal("Value");
 
-                try
+                while (reader.Read())
                 {
-                    using (SqlCommand cmd = new SqlCommand(null, con))
-                    {
-                        cmd.Transaction = txn;
-                        result = GetByPk(cmd, Id);
-                    }
+                    JobRunStat item = new JobRunStat();
 
-                    txn.Commit();
-                }
-                catch
-                {
-                    txn.Rollback();
-                    throw;
+                    item.IsNew = false;
+                    item.Id = reader.GetInt32(IdIndex);
+                    item.JobRunId = reader.GetInt32(JobRunIdIndex);
+                    item.JobRunStatTypeId = reader.GetInt32(JobRunStatTypeIdIndex);
+                    item.Value = reader.GetString(ValueIndex).Trim();
+
+                    result.Add(item);
                 }
             }
 
             return result;
         }
 
-        public List<JobRunStat> GetByPk(SqlCommand cmd, int? Id)
+        public List<JobRunStat> GetAll()
         {
-            List<JobRunStat> result = new List<JobRunStat>();
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            cmd.CommandText = "SELECT * FROM [dbo].[JobRunStats] WHERE (@Id IS NULL OR [Id] = @Id)";
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    return GetAll(cmd);
+            }
+        }
+
+        public List<JobRunStat> GetAll(SqlCommand cmd)
+        {
+            cmd.CommandText = "SELECT * FROM [dbo].[JobRunStats]";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
 
             using (SqlDataReader reader = cmd.ExecuteReader())
-                if (reader.HasRows)
-                {
-                    int IdIndex = reader.GetOrdinal("Id");
-                    int JobRunIdIndex = reader.GetOrdinal("JobRunId");
-                    int JobRunStatTypeIdIndex = reader.GetOrdinal("JobRunStatTypeId");
-                    int ValueIndex = reader.GetOrdinal("Value");
+                return ReadRecords(reader);
+        }
 
-                    while (reader.Read())
-                    {
-                        JobRunStat item = new JobRunStat();
+        public JobRunStat GetByPk(int Id)
+        {
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-                        item.IsNew = false;
-                        item.Id = reader.GetInt32(IdIndex);
-                        item.JobRunId = reader.GetInt32(JobRunIdIndex);
-                        item.JobRunStatTypeId = reader.GetInt32(JobRunStatTypeIdIndex);
-                        item.Value = reader.GetString(ValueIndex).Trim();
-
-                        result.Add(item);
-                    }
-                }
-
-                return result;
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    return GetByPk(cmd, Id);
             }
+        }
+
+        public JobRunStat GetByPk(SqlCommand cmd, int Id)
+        {
+            cmd.CommandText = "SELECT * FROM [dbo].[JobRunStats] WHERE [Id] = @Id";
+            cmd.CommandType = CommandType.Text;
+            cmd.Parameters.Clear();
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
+
+            using (SqlDataReader reader = cmd.ExecuteReader())
+            {
+                List<JobRunStat> result = ReadRecords(reader);
+                return result.Count == 1 ? result[0] : null;
+            }
+        }
 
         public void Update(JobRunStat item)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
+
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    Update(cmd, item);
+            }
+        }
+
+        public void Update(List<JobRunStat> items)
+        {
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -162,7 +204,9 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        Update(cmd, item);
+
+                        foreach (var item in items)
+                            Update(cmd, item);
                     }
 
                     txn.Commit();
@@ -181,17 +225,17 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, item.Id));
-            cmd.Parameters.Add(SQL.Parameter("@JobRunId", SqlDbType.Int, item.JobRunId));
-            cmd.Parameters.Add(SQL.Parameter("@JobRunStatTypeId", SqlDbType.Int, item.JobRunStatTypeId));
-            cmd.Parameters.Add(SQL.Parameter("@Value", SqlDbType.VarChar, item.Value));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
+            cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.Int, item.JobRunId));
+            cmd.Parameters.Add(Parameter("@JobRunStatTypeId", SqlDbType.Int, item.JobRunStatTypeId));
+            cmd.Parameters.Add(Parameter("@Value", SqlDbType.VarChar, item.Value));
 
             cmd.ExecuteNonQuery();
         }
 
         public void Delete(int Id)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -220,16 +264,30 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
 
             cmd.ExecuteNonQuery();
         }
 
         public void Upsert(JobRunStat item)
         {
-            IOutputValueBinder result = null;
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    if (item.IsNew)
+                        Insert(cmd, item).Commit();
+                    else
+                        Update(cmd, item);
+            }
+        }
+
+        public void Upsert(List<JobRunStat> items)
+        {
+            List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
+
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -240,10 +298,11 @@ namespace TaskingSolutions.Data.DataAccess
                     {
                         cmd.Transaction = txn;
 
-                        if (item.IsNew)
-                            result = Insert(cmd, item);
-                        else
-                            Update(cmd, item);
+                        foreach (var item in items)
+                            if (item.IsNew)
+                                results.Add(Insert(cmd, item));
+                            else
+                                Update(cmd, item);
                     }
 
                     txn.Commit();
@@ -254,7 +313,8 @@ namespace TaskingSolutions.Data.DataAccess
                     throw;
                 }
 
-                if (result != null) result.Commit();
+                foreach (var result in results)
+                    result.Commit();
             }
         }
 

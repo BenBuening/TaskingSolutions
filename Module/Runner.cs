@@ -16,7 +16,7 @@ namespace TaskingSolutions.Module
 
         private const int _timerPollingInterval = 1000 * 60; // 60 seconds
 
-        private Logger _logger;
+        private FileLogger _logger;
         private Timer _checkJobsTimer;
         private DataAccessFactory _dataAccess;
         private EventWaitHandle _initGate;
@@ -36,18 +36,28 @@ namespace TaskingSolutions.Module
 
         private void CheckJobsTimerTick(object state)
         {
+            // todo: try/catch. in catch, send notification of failure? reset timer
+            
             _logger.LogDebug("Runner.CheckJobsTimerTick - enter");
             if (_checkJobsTimer != null)
             {
                 _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
+                // get running jobs count
 
                 // check db for newly triggered jobs
+                var due = _dataAccess.GetJobSchedulesAccessor().GetDueSchedules();
+
+                // split by priority, order by trigger time
+                // foreach priority, check canrunconcurrent vs running jobs count
+                // within each priority, if all canrunconcurrent, start jobs
+
+
                 //  update db for those jobs with new trigger times (trigger missed)
 
                 // check db for next job to start. consider priority, threadedness, trigger time
 
-                
+
                 // query job schedules for schedules with next trigger date <= now
                 // examine priority and multi-thread flags
                 // start any that can be started concurrently - if all running can be concurrent
@@ -57,9 +67,10 @@ namespace TaskingSolutions.Module
                 // any time check if tasks are running, remove completed tasks. probably doenst matter the timeline as task.waitall will count finished tasks immediately
 
 
-                
-                
 
+
+                // if job started is not canrunconcurrent, set continuation on task to enable timer
+                // else re-enable timer here
                 _checkJobsTimer.Change(_timerPollingInterval, Timeout.Infinite);
             }
             _logger.LogDebug("Runner.CheckJobsTimerTick - exit");
@@ -74,7 +85,7 @@ namespace TaskingSolutions.Module
 
         public Runner()
         {
-            _logger = new Logger(@"c:\_temp\JobRunnerModuleLog.txt");
+            _logger = new FileLogger(@"c:\_temp\JobRunnerModuleLog.txt");
             _dataAccess = new DataAccessFactory();
             _checkJobsTimer = new Timer(CheckJobsTimerTick, null, Timeout.Infinite, Timeout.Infinite);
             _initGate = new EventWaitHandle(false, EventResetMode.ManualReset);

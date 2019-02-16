@@ -23,9 +23,12 @@ namespace TaskingSolutions.Data.DataAccess
     {
 
         void Insert(DebugLog item);
+        void Insert(List<DebugLog> items);
         IOutputValueBinder Insert(SqlCommand cmd, DebugLog item);
-        List<DebugLog> GetByPk(int? Id);
-        List<DebugLog> GetByPk(SqlCommand cmd, int? Id);
+        List<DebugLog> GetAll();
+        List<DebugLog> GetAll(SqlCommand cmd);
+        DebugLog GetByPk(int Id);
+        DebugLog GetByPk(SqlCommand cmd, int Id);
         void Update(DebugLog item);
         void Update(SqlCommand cmd, DebugLog item);
         void Delete(int Id);
@@ -35,14 +38,28 @@ namespace TaskingSolutions.Data.DataAccess
     }
 
 
-    internal partial class DebugLogsAccessor : IDebugLogsAccessor
+    internal partial class DebugLogsAccessor : AccessorBase, IDebugLogsAccessor
     {
+
+        public DebugLogsAccessor(string connectionString) : base(connectionString) { }
+
 
         public void Insert(DebugLog item)
         {
-            IOutputValueBinder result;
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    Insert(cmd, item).Commit();
+            }
+        }
+
+        public void Insert(List<DebugLog> items)
+        {
+            List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
+
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -52,7 +69,9 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        result = Insert(cmd, item);
+
+                        foreach (var item in items)
+                            results.Add(Insert(cmd, item));
                     }
 
                     txn.Commit();
@@ -63,7 +82,8 @@ namespace TaskingSolutions.Data.DataAccess
                     throw;
                 }
 
-                result.Commit();
+                foreach (var result in results)
+                    result.Commit();
             }
         }
 
@@ -75,10 +95,10 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[DebugLogs] ([Timestamp], [Message], [AdditionalData]) OUTPUT Inserted.[Id] INTO @results VALUES (@Timestamp, @Message, @AdditionalData); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            SqlParameter IdParam = cmd.Parameters.Add(SQL.OutputParameter("@Id", SqlDbType.Int));
-            SqlParameter TimestampParam = cmd.Parameters.Add(SQL.Parameter("@Timestamp", SqlDbType.DateTime2, item.Timestamp));
-            SqlParameter MessageParam = cmd.Parameters.Add(SQL.Parameter("@Message", SqlDbType.VarChar, item.Message));
-            SqlParameter AdditionalDataParam = cmd.Parameters.Add(SQL.Parameter("@AdditionalData", SqlDbType.VarChar, item.AdditionalData));
+            SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
+            SqlParameter TimestampParam = cmd.Parameters.Add(Parameter("@Timestamp", SqlDbType.DateTime2, item.Timestamp));
+            SqlParameter MessageParam = cmd.Parameters.Add(Parameter("@Message", SqlDbType.VarChar, item.Message));
+            SqlParameter AdditionalDataParam = cmd.Parameters.Add(Parameter("@AdditionalData", SqlDbType.VarChar, item.AdditionalData));
 
             cmd.ExecuteNonQuery();
 
@@ -87,72 +107,94 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<DebugLog> GetByPk(int? Id)
+        protected List<DebugLog> ReadRecords(SqlDataReader reader)
         {
-            List<DebugLog> result;
+            List<DebugLog> result = new List<DebugLog>();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            if (reader.HasRows)
             {
-                con.Open();
-                SqlTransaction txn = con.BeginTransaction();
+                int IdIndex = reader.GetOrdinal("Id");
+                int TimestampIndex = reader.GetOrdinal("Timestamp");
+                int MessageIndex = reader.GetOrdinal("Message");
+                int AdditionalDataIndex = reader.GetOrdinal("AdditionalData");
 
-                try
+                while (reader.Read())
                 {
-                    using (SqlCommand cmd = new SqlCommand(null, con))
-                    {
-                        cmd.Transaction = txn;
-                        result = GetByPk(cmd, Id);
-                    }
+                    DebugLog item = new DebugLog();
 
-                    txn.Commit();
-                }
-                catch
-                {
-                    txn.Rollback();
-                    throw;
+                    item.IsNew = false;
+                    item.Id = reader.GetInt32(IdIndex);
+                    item.Timestamp = reader.GetDateTime(TimestampIndex);
+                    item.Message = reader.GetString(MessageIndex).Trim();
+                    item.AdditionalData = reader.GetString(AdditionalDataIndex).Trim();
+
+                    result.Add(item);
                 }
             }
 
             return result;
         }
 
-        public List<DebugLog> GetByPk(SqlCommand cmd, int? Id)
+        public List<DebugLog> GetAll()
         {
-            List<DebugLog> result = new List<DebugLog>();
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            cmd.CommandText = "SELECT * FROM [dbo].[DebugLogs] WHERE (@Id IS NULL OR [Id] = @Id)";
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    return GetAll(cmd);
+            }
+        }
+
+        public List<DebugLog> GetAll(SqlCommand cmd)
+        {
+            cmd.CommandText = "SELECT * FROM [dbo].[DebugLogs]";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
 
             using (SqlDataReader reader = cmd.ExecuteReader())
-                if (reader.HasRows)
-                {
-                    int IdIndex = reader.GetOrdinal("Id");
-                    int TimestampIndex = reader.GetOrdinal("Timestamp");
-                    int MessageIndex = reader.GetOrdinal("Message");
-                    int AdditionalDataIndex = reader.GetOrdinal("AdditionalData");
+                return ReadRecords(reader);
+        }
 
-                    while (reader.Read())
-                    {
-                        DebugLog item = new DebugLog();
+        public DebugLog GetByPk(int Id)
+        {
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-                        item.IsNew = false;
-                        item.Id = reader.GetInt32(IdIndex);
-                        item.Timestamp = reader.GetDateTime(TimestampIndex);
-                        item.Message = reader.GetString(MessageIndex).Trim();
-                        item.AdditionalData = reader.GetString(AdditionalDataIndex).Trim();
-
-                        result.Add(item);
-                    }
-                }
-
-                return result;
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    return GetByPk(cmd, Id);
             }
+        }
+
+        public DebugLog GetByPk(SqlCommand cmd, int Id)
+        {
+            cmd.CommandText = "SELECT * FROM [dbo].[DebugLogs] WHERE [Id] = @Id";
+            cmd.CommandType = CommandType.Text;
+            cmd.Parameters.Clear();
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
+
+            using (SqlDataReader reader = cmd.ExecuteReader())
+            {
+                List<DebugLog> result = ReadRecords(reader);
+                return result.Count == 1 ? result[0] : null;
+            }
+        }
 
         public void Update(DebugLog item)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
+
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    Update(cmd, item);
+            }
+        }
+
+        public void Update(List<DebugLog> items)
+        {
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -162,7 +204,9 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        Update(cmd, item);
+
+                        foreach (var item in items)
+                            Update(cmd, item);
                     }
 
                     txn.Commit();
@@ -181,17 +225,17 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, item.Id));
-            cmd.Parameters.Add(SQL.Parameter("@Timestamp", SqlDbType.DateTime2, item.Timestamp));
-            cmd.Parameters.Add(SQL.Parameter("@Message", SqlDbType.VarChar, item.Message));
-            cmd.Parameters.Add(SQL.Parameter("@AdditionalData", SqlDbType.VarChar, item.AdditionalData));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
+            cmd.Parameters.Add(Parameter("@Timestamp", SqlDbType.DateTime2, item.Timestamp));
+            cmd.Parameters.Add(Parameter("@Message", SqlDbType.VarChar, item.Message));
+            cmd.Parameters.Add(Parameter("@AdditionalData", SqlDbType.VarChar, item.AdditionalData));
 
             cmd.ExecuteNonQuery();
         }
 
         public void Delete(int Id)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -220,16 +264,30 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
 
             cmd.ExecuteNonQuery();
         }
 
         public void Upsert(DebugLog item)
         {
-            IOutputValueBinder result = null;
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    if (item.IsNew)
+                        Insert(cmd, item).Commit();
+                    else
+                        Update(cmd, item);
+            }
+        }
+
+        public void Upsert(List<DebugLog> items)
+        {
+            List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
+
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -240,10 +298,11 @@ namespace TaskingSolutions.Data.DataAccess
                     {
                         cmd.Transaction = txn;
 
-                        if (item.IsNew)
-                            result = Insert(cmd, item);
-                        else
-                            Update(cmd, item);
+                        foreach (var item in items)
+                            if (item.IsNew)
+                                results.Add(Insert(cmd, item));
+                            else
+                                Update(cmd, item);
                     }
 
                     txn.Commit();
@@ -254,7 +313,8 @@ namespace TaskingSolutions.Data.DataAccess
                     throw;
                 }
 
-                if (result != null) result.Commit();
+                foreach (var result in results)
+                    result.Commit();
             }
         }
 

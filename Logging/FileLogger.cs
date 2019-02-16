@@ -3,18 +3,18 @@ using System.IO;
 
 namespace TaskingSolutions.Logging
 {
-    public class Logger
+    public class FileLogger
     {
 
         public string LogFilePath { get; set; }
         public LogLevel LogLevel { get; set; }
 
-        public Logger()
+        public FileLogger()
         {
             this.LogFilePath = @"c:\_temp\JobRunnerLog.txt";
         }
 
-        public Logger(string logFilePath)
+        public FileLogger(string logFilePath)
         {
             this.LogFilePath = logFilePath;
         }

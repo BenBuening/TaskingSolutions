@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Data.SqlClient;
+using System.Configuration;
 
 namespace TaskingSolutions.Data.DataAccess
 {
@@ -35,39 +32,63 @@ namespace TaskingSolutions.Data.DataAccess
     public partial class DataAccessFactory : IDataAccessFactory
     {
 
+         private string ConnectionString { get; set; }
+
+         public DataAccessFactory(string connectionStringConfigKey)
+         {
+             if (ConfigurationManager.ConnectionStrings.Count == 0)
+                 throw new ConfigurationErrorsException($"No connection string was found in the.config file");
+
+             var conStr = ConfigurationManager.ConnectionStrings[connectionStringConfigKey];
+             if (conStr == null)
+                 throw new ConfigurationErrorsException($"Connection string with key {connectionStringConfigKey} was not found in the .config file");
+
+             this.ConnectionString = conStr.ConnectionString;
+         }
+
+         public DataAccessFactory()
+         {
+             if (ConfigurationManager.ConnectionStrings.Count == 0)
+                 throw new ConfigurationErrorsException($"No connection string was found in the.config file");
+
+             var conStr = ConfigurationManager.ConnectionStrings["Default"] ?? ConfigurationManager.ConnectionStrings[0];
+             this.ConnectionString = conStr.ConnectionString;
+         }
+
+
         public IDebugLogsAccessor GetDebugLogsAccessor()
         {
-            return new DebugLogsAccessor();
+            return new DebugLogsAccessor(this.ConnectionString);
         }
 
         public IErrorLogsAccessor GetErrorLogsAccessor()
         {
-            return new ErrorLogsAccessor();
+            return new ErrorLogsAccessor(this.ConnectionString);
         }
 
         public IJobRunsAccessor GetJobRunsAccessor()
         {
-            return new JobRunsAccessor();
+            return new JobRunsAccessor(this.ConnectionString);
         }
 
         public IJobRunStatsAccessor GetJobRunStatsAccessor()
         {
-            return new JobRunStatsAccessor();
+            return new JobRunStatsAccessor(this.ConnectionString);
         }
 
         public IJobRunStatTypesAccessor GetJobRunStatTypesAccessor()
         {
-            return new JobRunStatTypesAccessor();
+            return new JobRunStatTypesAccessor(this.ConnectionString);
         }
 
         public IJobsAccessor GetJobsAccessor()
         {
-            return new JobsAccessor();
+            return new JobsAccessor(this.ConnectionString);
         }
 
         public IJobSchedulesAccessor GetJobSchedulesAccessor()
         {
-            return new JobSchedulesAccessor();
+            return new JobSchedulesAccessor(this.ConnectionString);
         }
 
     }

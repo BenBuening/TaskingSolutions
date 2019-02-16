@@ -23,9 +23,12 @@ namespace TaskingSolutions.Data.DataAccess
     {
 
         void Insert(Job item);
+        void Insert(List<Job> items);
         IOutputValueBinder Insert(SqlCommand cmd, Job item);
-        List<Job> GetByPk(int? Id);
-        List<Job> GetByPk(SqlCommand cmd, int? Id);
+        List<Job> GetAll();
+        List<Job> GetAll(SqlCommand cmd);
+        Job GetByPk(int Id);
+        Job GetByPk(SqlCommand cmd, int Id);
         void Update(Job item);
         void Update(SqlCommand cmd, Job item);
         void Delete(int Id);
@@ -35,14 +38,28 @@ namespace TaskingSolutions.Data.DataAccess
     }
 
 
-    internal partial class JobsAccessor : IJobsAccessor
+    internal partial class JobsAccessor : AccessorBase, IJobsAccessor
     {
+
+        public JobsAccessor(string connectionString) : base(connectionString) { }
+
 
         public void Insert(Job item)
         {
-            IOutputValueBinder result;
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    Insert(cmd, item).Commit();
+            }
+        }
+
+        public void Insert(List<Job> items)
+        {
+            List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
+
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -52,7 +69,9 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        result = Insert(cmd, item);
+
+                        foreach (var item in items)
+                            results.Add(Insert(cmd, item));
                     }
 
                     txn.Commit();
@@ -63,7 +82,8 @@ namespace TaskingSolutions.Data.DataAccess
                     throw;
                 }
 
-                result.Commit();
+                foreach (var result in results)
+                    result.Commit();
             }
         }
 
@@ -75,17 +95,17 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[Jobs] ([Name], [IsSystemJob], [CanRunConcurrent], [QueueMultipleInstances], [OnShutdown], [JobQueuePriority], [AlertsEmailList], [AlertIfNotRunForXMinutes], [DotNetType], [IsDotNetTypeMissing]) OUTPUT Inserted.[Id] INTO @results VALUES (@Name, @IsSystemJob, @CanRunConcurrent, @QueueMultipleInstances, @OnShutdown, @JobQueuePriority, @AlertsEmailList, @AlertIfNotRunForXMinutes, @DotNetType, @IsDotNetTypeMissing); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            SqlParameter IdParam = cmd.Parameters.Add(SQL.OutputParameter("@Id", SqlDbType.Int));
-            SqlParameter NameParam = cmd.Parameters.Add(SQL.Parameter("@Name", SqlDbType.VarChar, item.Name));
-            SqlParameter IsSystemJobParam = cmd.Parameters.Add(SQL.Parameter("@IsSystemJob", SqlDbType.Bit, item.IsSystemJob));
-            SqlParameter CanRunConcurrentParam = cmd.Parameters.Add(SQL.Parameter("@CanRunConcurrent", SqlDbType.Bit, item.CanRunConcurrent));
-            SqlParameter QueueMultipleInstancesParam = cmd.Parameters.Add(SQL.Parameter("@QueueMultipleInstances", SqlDbType.Bit, item.QueueMultipleInstances));
-            SqlParameter OnShutdownParam = cmd.Parameters.Add(SQL.Parameter("@OnShutdown", SqlDbType.TinyInt, item.OnShutdown));
-            SqlParameter JobQueuePriorityParam = cmd.Parameters.Add(SQL.Parameter("@JobQueuePriority", SqlDbType.TinyInt, (byte)item.JobQueuePriority));
-            SqlParameter AlertsEmailListParam = cmd.Parameters.Add(SQL.Parameter("@AlertsEmailList", SqlDbType.VarChar, item.AlertsEmailList));
-            SqlParameter AlertIfNotRunForXMinutesParam = cmd.Parameters.Add(SQL.Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
-            SqlParameter DotNetTypeParam = cmd.Parameters.Add(SQL.Parameter("@DotNetType", SqlDbType.VarChar, item.DotNetType));
-            SqlParameter IsDotNetTypeMissingParam = cmd.Parameters.Add(SQL.Parameter("@IsDotNetTypeMissing", SqlDbType.Bit, item.IsDotNetTypeMissing));
+            SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
+            SqlParameter NameParam = cmd.Parameters.Add(Parameter("@Name", SqlDbType.VarChar, item.Name));
+            SqlParameter IsSystemJobParam = cmd.Parameters.Add(Parameter("@IsSystemJob", SqlDbType.Bit, item.IsSystemJob));
+            SqlParameter CanRunConcurrentParam = cmd.Parameters.Add(Parameter("@CanRunConcurrent", SqlDbType.Bit, item.CanRunConcurrent));
+            SqlParameter QueueMultipleInstancesParam = cmd.Parameters.Add(Parameter("@QueueMultipleInstances", SqlDbType.Bit, item.QueueMultipleInstances));
+            SqlParameter OnShutdownParam = cmd.Parameters.Add(Parameter("@OnShutdown", SqlDbType.TinyInt, item.OnShutdown));
+            SqlParameter JobQueuePriorityParam = cmd.Parameters.Add(Parameter("@JobQueuePriority", SqlDbType.TinyInt, (byte)item.JobQueuePriority));
+            SqlParameter AlertsEmailListParam = cmd.Parameters.Add(Parameter("@AlertsEmailList", SqlDbType.VarChar, item.AlertsEmailList));
+            SqlParameter AlertIfNotRunForXMinutesParam = cmd.Parameters.Add(Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
+            SqlParameter DotNetTypeParam = cmd.Parameters.Add(Parameter("@DotNetType", SqlDbType.VarChar, item.DotNetType));
+            SqlParameter IsDotNetTypeMissingParam = cmd.Parameters.Add(Parameter("@IsDotNetTypeMissing", SqlDbType.Bit, item.IsDotNetTypeMissing));
 
             cmd.ExecuteNonQuery();
 
@@ -94,86 +114,108 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<Job> GetByPk(int? Id)
+        protected List<Job> ReadRecords(SqlDataReader reader)
         {
-            List<Job> result;
+            List<Job> result = new List<Job>();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            if (reader.HasRows)
             {
-                con.Open();
-                SqlTransaction txn = con.BeginTransaction();
+                int IdIndex = reader.GetOrdinal("Id");
+                int NameIndex = reader.GetOrdinal("Name");
+                int IsSystemJobIndex = reader.GetOrdinal("IsSystemJob");
+                int CanRunConcurrentIndex = reader.GetOrdinal("CanRunConcurrent");
+                int QueueMultipleInstancesIndex = reader.GetOrdinal("QueueMultipleInstances");
+                int OnShutdownIndex = reader.GetOrdinal("OnShutdown");
+                int JobQueuePriorityIndex = reader.GetOrdinal("JobQueuePriority");
+                int AlertsEmailListIndex = reader.GetOrdinal("AlertsEmailList");
+                int AlertIfNotRunForXMinutesIndex = reader.GetOrdinal("AlertIfNotRunForXMinutes");
+                int DotNetTypeIndex = reader.GetOrdinal("DotNetType");
+                int IsDotNetTypeMissingIndex = reader.GetOrdinal("IsDotNetTypeMissing");
 
-                try
+                while (reader.Read())
                 {
-                    using (SqlCommand cmd = new SqlCommand(null, con))
-                    {
-                        cmd.Transaction = txn;
-                        result = GetByPk(cmd, Id);
-                    }
+                    Job item = new Job();
 
-                    txn.Commit();
-                }
-                catch
-                {
-                    txn.Rollback();
-                    throw;
+                    item.IsNew = false;
+                    item.Id = reader.GetInt32(IdIndex);
+                    item.Name = reader.GetString(NameIndex).Trim();
+                    item.IsSystemJob = reader.GetBoolean(IsSystemJobIndex);
+                    item.CanRunConcurrent = reader.GetBoolean(CanRunConcurrentIndex);
+                    item.QueueMultipleInstances = reader.GetBoolean(QueueMultipleInstancesIndex);
+                    item.OnShutdown = reader.GetByte(OnShutdownIndex);
+                    item.JobQueuePriority = (TaskingSolutions.Interfaces.JobQueuePriority)reader.GetByte(JobQueuePriorityIndex);
+                    if (!reader.IsDBNull(AlertsEmailListIndex)) item.AlertsEmailList = reader.GetString(AlertsEmailListIndex).Trim();
+                    if (!reader.IsDBNull(AlertIfNotRunForXMinutesIndex)) item.AlertIfNotRunForXMinutes = reader.GetDecimal(AlertIfNotRunForXMinutesIndex);
+                    item.DotNetType = reader.GetString(DotNetTypeIndex).Trim();
+                    item.IsDotNetTypeMissing = reader.GetBoolean(IsDotNetTypeMissingIndex);
+
+                    result.Add(item);
                 }
             }
 
             return result;
         }
 
-        public List<Job> GetByPk(SqlCommand cmd, int? Id)
+        public List<Job> GetAll()
         {
-            List<Job> result = new List<Job>();
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            cmd.CommandText = "SELECT * FROM [dbo].[Jobs] WHERE (@Id IS NULL OR [Id] = @Id)";
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    return GetAll(cmd);
+            }
+        }
+
+        public List<Job> GetAll(SqlCommand cmd)
+        {
+            cmd.CommandText = "SELECT * FROM [dbo].[Jobs]";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
 
             using (SqlDataReader reader = cmd.ExecuteReader())
-                if (reader.HasRows)
-                {
-                    int IdIndex = reader.GetOrdinal("Id");
-                    int NameIndex = reader.GetOrdinal("Name");
-                    int IsSystemJobIndex = reader.GetOrdinal("IsSystemJob");
-                    int CanRunConcurrentIndex = reader.GetOrdinal("CanRunConcurrent");
-                    int QueueMultipleInstancesIndex = reader.GetOrdinal("QueueMultipleInstances");
-                    int OnShutdownIndex = reader.GetOrdinal("OnShutdown");
-                    int JobQueuePriorityIndex = reader.GetOrdinal("JobQueuePriority");
-                    int AlertsEmailListIndex = reader.GetOrdinal("AlertsEmailList");
-                    int AlertIfNotRunForXMinutesIndex = reader.GetOrdinal("AlertIfNotRunForXMinutes");
-                    int DotNetTypeIndex = reader.GetOrdinal("DotNetType");
-                    int IsDotNetTypeMissingIndex = reader.GetOrdinal("IsDotNetTypeMissing");
+                return ReadRecords(reader);
+        }
 
-                    while (reader.Read())
-                    {
-                        Job item = new Job();
+        public Job GetByPk(int Id)
+        {
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-                        item.IsNew = false;
-                        item.Id = reader.GetInt32(IdIndex);
-                        item.Name = reader.GetString(NameIndex).Trim();
-                        item.IsSystemJob = reader.GetBoolean(IsSystemJobIndex);
-                        item.CanRunConcurrent = reader.GetBoolean(CanRunConcurrentIndex);
-                        item.QueueMultipleInstances = reader.GetBoolean(QueueMultipleInstancesIndex);
-                        item.OnShutdown = reader.GetByte(OnShutdownIndex);
-                        item.JobQueuePriority = (TaskingSolutions.Interfaces.JobQueuePriority)reader.GetByte(JobQueuePriorityIndex);
-                        if (!reader.IsDBNull(AlertsEmailListIndex)) item.AlertsEmailList = reader.GetString(AlertsEmailListIndex).Trim();
-                        if (!reader.IsDBNull(AlertIfNotRunForXMinutesIndex)) item.AlertIfNotRunForXMinutes = reader.GetDecimal(AlertIfNotRunForXMinutesIndex);
-                        item.DotNetType = reader.GetString(DotNetTypeIndex).Trim();
-                        item.IsDotNetTypeMissing = reader.GetBoolean(IsDotNetTypeMissingIndex);
-
-                        result.Add(item);
-                    }
-                }
-
-                return result;
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    return GetByPk(cmd, Id);
             }
+        }
+
+        public Job GetByPk(SqlCommand cmd, int Id)
+        {
+            cmd.CommandText = "SELECT * FROM [dbo].[Jobs] WHERE [Id] = @Id";
+            cmd.CommandType = CommandType.Text;
+            cmd.Parameters.Clear();
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
+
+            using (SqlDataReader reader = cmd.ExecuteReader())
+            {
+                List<Job> result = ReadRecords(reader);
+                return result.Count == 1 ? result[0] : null;
+            }
+        }
 
         public void Update(Job item)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
+
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    Update(cmd, item);
+            }
+        }
+
+        public void Update(List<Job> items)
+        {
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -183,7 +225,9 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        Update(cmd, item);
+
+                        foreach (var item in items)
+                            Update(cmd, item);
                     }
 
                     txn.Commit();
@@ -202,24 +246,24 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, item.Id));
-            cmd.Parameters.Add(SQL.Parameter("@Name", SqlDbType.VarChar, item.Name));
-            cmd.Parameters.Add(SQL.Parameter("@IsSystemJob", SqlDbType.Bit, item.IsSystemJob));
-            cmd.Parameters.Add(SQL.Parameter("@CanRunConcurrent", SqlDbType.Bit, item.CanRunConcurrent));
-            cmd.Parameters.Add(SQL.Parameter("@QueueMultipleInstances", SqlDbType.Bit, item.QueueMultipleInstances));
-            cmd.Parameters.Add(SQL.Parameter("@OnShutdown", SqlDbType.TinyInt, item.OnShutdown));
-            cmd.Parameters.Add(SQL.Parameter("@JobQueuePriority", SqlDbType.TinyInt, (byte)item.JobQueuePriority));
-            cmd.Parameters.Add(SQL.Parameter("@AlertsEmailList", SqlDbType.VarChar, item.AlertsEmailList));
-            cmd.Parameters.Add(SQL.Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
-            cmd.Parameters.Add(SQL.Parameter("@DotNetType", SqlDbType.VarChar, item.DotNetType));
-            cmd.Parameters.Add(SQL.Parameter("@IsDotNetTypeMissing", SqlDbType.Bit, item.IsDotNetTypeMissing));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
+            cmd.Parameters.Add(Parameter("@Name", SqlDbType.VarChar, item.Name));
+            cmd.Parameters.Add(Parameter("@IsSystemJob", SqlDbType.Bit, item.IsSystemJob));
+            cmd.Parameters.Add(Parameter("@CanRunConcurrent", SqlDbType.Bit, item.CanRunConcurrent));
+            cmd.Parameters.Add(Parameter("@QueueMultipleInstances", SqlDbType.Bit, item.QueueMultipleInstances));
+            cmd.Parameters.Add(Parameter("@OnShutdown", SqlDbType.TinyInt, item.OnShutdown));
+            cmd.Parameters.Add(Parameter("@JobQueuePriority", SqlDbType.TinyInt, (byte)item.JobQueuePriority));
+            cmd.Parameters.Add(Parameter("@AlertsEmailList", SqlDbType.VarChar, item.AlertsEmailList));
+            cmd.Parameters.Add(Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
+            cmd.Parameters.Add(Parameter("@DotNetType", SqlDbType.VarChar, item.DotNetType));
+            cmd.Parameters.Add(Parameter("@IsDotNetTypeMissing", SqlDbType.Bit, item.IsDotNetTypeMissing));
 
             cmd.ExecuteNonQuery();
         }
 
         public void Delete(int Id)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -248,16 +292,30 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
 
             cmd.ExecuteNonQuery();
         }
 
         public void Upsert(Job item)
         {
-            IOutputValueBinder result = null;
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    if (item.IsNew)
+                        Insert(cmd, item).Commit();
+                    else
+                        Update(cmd, item);
+            }
+        }
+
+        public void Upsert(List<Job> items)
+        {
+            List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
+
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -268,10 +326,11 @@ namespace TaskingSolutions.Data.DataAccess
                     {
                         cmd.Transaction = txn;
 
-                        if (item.IsNew)
-                            result = Insert(cmd, item);
-                        else
-                            Update(cmd, item);
+                        foreach (var item in items)
+                            if (item.IsNew)
+                                results.Add(Insert(cmd, item));
+                            else
+                                Update(cmd, item);
                     }
 
                     txn.Commit();
@@ -282,7 +341,8 @@ namespace TaskingSolutions.Data.DataAccess
                     throw;
                 }
 
-                if (result != null) result.Commit();
+                foreach (var result in results)
+                    result.Commit();
             }
         }
 

@@ -23,9 +23,12 @@ namespace TaskingSolutions.Data.DataAccess
     {
 
         void Insert(JobSchedule item);
+        void Insert(List<JobSchedule> items);
         IOutputValueBinder Insert(SqlCommand cmd, JobSchedule item);
-        List<JobSchedule> GetByPk(int? Id);
-        List<JobSchedule> GetByPk(SqlCommand cmd, int? Id);
+        List<JobSchedule> GetAll();
+        List<JobSchedule> GetAll(SqlCommand cmd);
+        JobSchedule GetByPk(int Id);
+        JobSchedule GetByPk(SqlCommand cmd, int Id);
         void Update(JobSchedule item);
         void Update(SqlCommand cmd, JobSchedule item);
         void Delete(int Id);
@@ -35,14 +38,28 @@ namespace TaskingSolutions.Data.DataAccess
     }
 
 
-    internal partial class JobSchedulesAccessor : IJobSchedulesAccessor
+    internal partial class JobSchedulesAccessor : AccessorBase, IJobSchedulesAccessor
     {
+
+        public JobSchedulesAccessor(string connectionString) : base(connectionString) { }
+
 
         public void Insert(JobSchedule item)
         {
-            IOutputValueBinder result;
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    Insert(cmd, item).Commit();
+            }
+        }
+
+        public void Insert(List<JobSchedule> items)
+        {
+            List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
+
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -52,7 +69,9 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        result = Insert(cmd, item);
+
+                        foreach (var item in items)
+                            results.Add(Insert(cmd, item));
                     }
 
                     txn.Commit();
@@ -63,7 +82,8 @@ namespace TaskingSolutions.Data.DataAccess
                     throw;
                 }
 
-                result.Commit();
+                foreach (var result in results)
+                    result.Commit();
             }
         }
 
@@ -75,15 +95,15 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[JobSchedules] ([JobId], [InitialTriggerTime], [RecurrenceType], [RecurrenceInterval], [TimesToRecur], [RecurUntil], [TimesTriggered], [NextTriggerTime]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobId, @InitialTriggerTime, @RecurrenceType, @RecurrenceInterval, @TimesToRecur, @RecurUntil, @TimesTriggered, @NextTriggerTime); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            SqlParameter IdParam = cmd.Parameters.Add(SQL.OutputParameter("@Id", SqlDbType.Int));
-            SqlParameter JobIdParam = cmd.Parameters.Add(SQL.Parameter("@JobId", SqlDbType.Int, item.JobId));
-            SqlParameter InitialTriggerTimeParam = cmd.Parameters.Add(SQL.Parameter("@InitialTriggerTime", SqlDbType.DateTime2, item.InitialTriggerTime));
-            SqlParameter RecurrenceTypeParam = cmd.Parameters.Add(SQL.Parameter("@RecurrenceType", SqlDbType.SmallInt, (short)item.RecurrenceType));
-            SqlParameter RecurrenceIntervalParam = cmd.Parameters.Add(SQL.Parameter("@RecurrenceInterval", SqlDbType.Int, item.RecurrenceInterval));
-            SqlParameter TimesToRecurParam = cmd.Parameters.Add(SQL.Parameter("@TimesToRecur", SqlDbType.Int, item.TimesToRecur));
-            SqlParameter RecurUntilParam = cmd.Parameters.Add(SQL.Parameter("@RecurUntil", SqlDbType.DateTime2, item.RecurUntil));
-            SqlParameter TimesTriggeredParam = cmd.Parameters.Add(SQL.Parameter("@TimesTriggered", SqlDbType.Int, item.TimesTriggered));
-            SqlParameter NextTriggerTimeParam = cmd.Parameters.Add(SQL.Parameter("@NextTriggerTime", SqlDbType.DateTime2, item.NextTriggerTime));
+            SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
+            SqlParameter JobIdParam = cmd.Parameters.Add(Parameter("@JobId", SqlDbType.Int, item.JobId));
+            SqlParameter InitialTriggerTimeParam = cmd.Parameters.Add(Parameter("@InitialTriggerTime", SqlDbType.DateTime2, item.InitialTriggerTime));
+            SqlParameter RecurrenceTypeParam = cmd.Parameters.Add(Parameter("@RecurrenceType", SqlDbType.SmallInt, (short)item.RecurrenceType));
+            SqlParameter RecurrenceIntervalParam = cmd.Parameters.Add(Parameter("@RecurrenceInterval", SqlDbType.Int, item.RecurrenceInterval));
+            SqlParameter TimesToRecurParam = cmd.Parameters.Add(Parameter("@TimesToRecur", SqlDbType.Int, item.TimesToRecur));
+            SqlParameter RecurUntilParam = cmd.Parameters.Add(Parameter("@RecurUntil", SqlDbType.DateTime2, item.RecurUntil));
+            SqlParameter TimesTriggeredParam = cmd.Parameters.Add(Parameter("@TimesTriggered", SqlDbType.Int, item.TimesTriggered));
+            SqlParameter NextTriggerTimeParam = cmd.Parameters.Add(Parameter("@NextTriggerTime", SqlDbType.DateTime2, item.NextTriggerTime));
 
             cmd.ExecuteNonQuery();
 
@@ -92,82 +112,104 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<JobSchedule> GetByPk(int? Id)
+        protected List<JobSchedule> ReadRecords(SqlDataReader reader)
         {
-            List<JobSchedule> result;
+            List<JobSchedule> result = new List<JobSchedule>();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            if (reader.HasRows)
             {
-                con.Open();
-                SqlTransaction txn = con.BeginTransaction();
+                int IdIndex = reader.GetOrdinal("Id");
+                int JobIdIndex = reader.GetOrdinal("JobId");
+                int InitialTriggerTimeIndex = reader.GetOrdinal("InitialTriggerTime");
+                int RecurrenceTypeIndex = reader.GetOrdinal("RecurrenceType");
+                int RecurrenceIntervalIndex = reader.GetOrdinal("RecurrenceInterval");
+                int TimesToRecurIndex = reader.GetOrdinal("TimesToRecur");
+                int RecurUntilIndex = reader.GetOrdinal("RecurUntil");
+                int TimesTriggeredIndex = reader.GetOrdinal("TimesTriggered");
+                int NextTriggerTimeIndex = reader.GetOrdinal("NextTriggerTime");
 
-                try
+                while (reader.Read())
                 {
-                    using (SqlCommand cmd = new SqlCommand(null, con))
-                    {
-                        cmd.Transaction = txn;
-                        result = GetByPk(cmd, Id);
-                    }
+                    JobSchedule item = new JobSchedule();
 
-                    txn.Commit();
-                }
-                catch
-                {
-                    txn.Rollback();
-                    throw;
+                    item.IsNew = false;
+                    item.Id = reader.GetInt32(IdIndex);
+                    item.JobId = reader.GetInt32(JobIdIndex);
+                    if (!reader.IsDBNull(InitialTriggerTimeIndex)) item.InitialTriggerTime = reader.GetDateTime(InitialTriggerTimeIndex);
+                    item.RecurrenceType = (RecurranceType)reader.GetInt16(RecurrenceTypeIndex);
+                    if (!reader.IsDBNull(RecurrenceIntervalIndex)) item.RecurrenceInterval = reader.GetInt32(RecurrenceIntervalIndex);
+                    if (!reader.IsDBNull(TimesToRecurIndex)) item.TimesToRecur = reader.GetInt32(TimesToRecurIndex);
+                    if (!reader.IsDBNull(RecurUntilIndex)) item.RecurUntil = reader.GetDateTime(RecurUntilIndex);
+                    item.TimesTriggered = reader.GetInt32(TimesTriggeredIndex);
+                    if (!reader.IsDBNull(NextTriggerTimeIndex)) item.NextTriggerTime = reader.GetDateTime(NextTriggerTimeIndex);
+
+                    result.Add(item);
                 }
             }
 
             return result;
         }
 
-        public List<JobSchedule> GetByPk(SqlCommand cmd, int? Id)
+        public List<JobSchedule> GetAll()
         {
-            List<JobSchedule> result = new List<JobSchedule>();
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            cmd.CommandText = "SELECT * FROM [dbo].[JobSchedules] WHERE (@Id IS NULL OR [Id] = @Id)";
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    return GetAll(cmd);
+            }
+        }
+
+        public List<JobSchedule> GetAll(SqlCommand cmd)
+        {
+            cmd.CommandText = "SELECT * FROM [dbo].[JobSchedules]";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
 
             using (SqlDataReader reader = cmd.ExecuteReader())
-                if (reader.HasRows)
-                {
-                    int IdIndex = reader.GetOrdinal("Id");
-                    int JobIdIndex = reader.GetOrdinal("JobId");
-                    int InitialTriggerTimeIndex = reader.GetOrdinal("InitialTriggerTime");
-                    int RecurrenceTypeIndex = reader.GetOrdinal("RecurrenceType");
-                    int RecurrenceIntervalIndex = reader.GetOrdinal("RecurrenceInterval");
-                    int TimesToRecurIndex = reader.GetOrdinal("TimesToRecur");
-                    int RecurUntilIndex = reader.GetOrdinal("RecurUntil");
-                    int TimesTriggeredIndex = reader.GetOrdinal("TimesTriggered");
-                    int NextTriggerTimeIndex = reader.GetOrdinal("NextTriggerTime");
+                return ReadRecords(reader);
+        }
 
-                    while (reader.Read())
-                    {
-                        JobSchedule item = new JobSchedule();
+        public JobSchedule GetByPk(int Id)
+        {
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-                        item.IsNew = false;
-                        item.Id = reader.GetInt32(IdIndex);
-                        item.JobId = reader.GetInt32(JobIdIndex);
-                        if (!reader.IsDBNull(InitialTriggerTimeIndex)) item.InitialTriggerTime = reader.GetDateTime(InitialTriggerTimeIndex);
-                        item.RecurrenceType = (RecurranceType)reader.GetInt16(RecurrenceTypeIndex);
-                        if (!reader.IsDBNull(RecurrenceIntervalIndex)) item.RecurrenceInterval = reader.GetInt32(RecurrenceIntervalIndex);
-                        if (!reader.IsDBNull(TimesToRecurIndex)) item.TimesToRecur = reader.GetInt32(TimesToRecurIndex);
-                        if (!reader.IsDBNull(RecurUntilIndex)) item.RecurUntil = reader.GetDateTime(RecurUntilIndex);
-                        item.TimesTriggered = reader.GetInt32(TimesTriggeredIndex);
-                        if (!reader.IsDBNull(NextTriggerTimeIndex)) item.NextTriggerTime = reader.GetDateTime(NextTriggerTimeIndex);
-
-                        result.Add(item);
-                    }
-                }
-
-                return result;
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    return GetByPk(cmd, Id);
             }
+        }
+
+        public JobSchedule GetByPk(SqlCommand cmd, int Id)
+        {
+            cmd.CommandText = "SELECT * FROM [dbo].[JobSchedules] WHERE [Id] = @Id";
+            cmd.CommandType = CommandType.Text;
+            cmd.Parameters.Clear();
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
+
+            using (SqlDataReader reader = cmd.ExecuteReader())
+            {
+                List<JobSchedule> result = ReadRecords(reader);
+                return result.Count == 1 ? result[0] : null;
+            }
+        }
 
         public void Update(JobSchedule item)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
+
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    Update(cmd, item);
+            }
+        }
+
+        public void Update(List<JobSchedule> items)
+        {
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -177,7 +219,9 @@ namespace TaskingSolutions.Data.DataAccess
                     using (SqlCommand cmd = new SqlCommand(null, con))
                     {
                         cmd.Transaction = txn;
-                        Update(cmd, item);
+
+                        foreach (var item in items)
+                            Update(cmd, item);
                     }
 
                     txn.Commit();
@@ -196,22 +240,22 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, item.Id));
-            cmd.Parameters.Add(SQL.Parameter("@JobId", SqlDbType.Int, item.JobId));
-            cmd.Parameters.Add(SQL.Parameter("@InitialTriggerTime", SqlDbType.DateTime2, item.InitialTriggerTime));
-            cmd.Parameters.Add(SQL.Parameter("@RecurrenceType", SqlDbType.SmallInt, (short)item.RecurrenceType));
-            cmd.Parameters.Add(SQL.Parameter("@RecurrenceInterval", SqlDbType.Int, item.RecurrenceInterval));
-            cmd.Parameters.Add(SQL.Parameter("@TimesToRecur", SqlDbType.Int, item.TimesToRecur));
-            cmd.Parameters.Add(SQL.Parameter("@RecurUntil", SqlDbType.DateTime2, item.RecurUntil));
-            cmd.Parameters.Add(SQL.Parameter("@TimesTriggered", SqlDbType.Int, item.TimesTriggered));
-            cmd.Parameters.Add(SQL.Parameter("@NextTriggerTime", SqlDbType.DateTime2, item.NextTriggerTime));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
+            cmd.Parameters.Add(Parameter("@JobId", SqlDbType.Int, item.JobId));
+            cmd.Parameters.Add(Parameter("@InitialTriggerTime", SqlDbType.DateTime2, item.InitialTriggerTime));
+            cmd.Parameters.Add(Parameter("@RecurrenceType", SqlDbType.SmallInt, (short)item.RecurrenceType));
+            cmd.Parameters.Add(Parameter("@RecurrenceInterval", SqlDbType.Int, item.RecurrenceInterval));
+            cmd.Parameters.Add(Parameter("@TimesToRecur", SqlDbType.Int, item.TimesToRecur));
+            cmd.Parameters.Add(Parameter("@RecurUntil", SqlDbType.DateTime2, item.RecurUntil));
+            cmd.Parameters.Add(Parameter("@TimesTriggered", SqlDbType.Int, item.TimesTriggered));
+            cmd.Parameters.Add(Parameter("@NextTriggerTime", SqlDbType.DateTime2, item.NextTriggerTime));
 
             cmd.ExecuteNonQuery();
         }
 
         public void Delete(int Id)
         {
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -240,16 +284,30 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(SQL.Parameter("@Id", SqlDbType.Int, Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
 
             cmd.ExecuteNonQuery();
         }
 
         public void Upsert(JobSchedule item)
         {
-            IOutputValueBinder result = null;
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
+            {
+                con.Open();
 
-            using (SqlConnection con = new SqlConnection(SQL.ConStr))
+                using (SqlCommand cmd = new SqlCommand(null, con))
+                    if (item.IsNew)
+                        Insert(cmd, item).Commit();
+                    else
+                        Update(cmd, item);
+            }
+        }
+
+        public void Upsert(List<JobSchedule> items)
+        {
+            List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
+
+            using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
                 con.Open();
                 SqlTransaction txn = con.BeginTransaction();
@@ -260,10 +318,11 @@ namespace TaskingSolutions.Data.DataAccess
                     {
                         cmd.Transaction = txn;
 
-                        if (item.IsNew)
-                            result = Insert(cmd, item);
-                        else
-                            Update(cmd, item);
+                        foreach (var item in items)
+                            if (item.IsNew)
+                                results.Add(Insert(cmd, item));
+                            else
+                                Update(cmd, item);
                     }
 
                     txn.Commit();
@@ -274,7 +333,8 @@ namespace TaskingSolutions.Data.DataAccess
                     throw;
                 }
 
-                if (result != null) result.Commit();
+                foreach (var result in results)
+                    result.Commit();
             }
         }
 

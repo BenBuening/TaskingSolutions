@@ -9,6 +9,7 @@ namespace TaskingSolutions.Data.DataAccess
     public interface IOutputValueBinder
     {
         void Commit();
+        object PeekAtBoundValue(string propertyName);
     }
 
 
@@ -37,6 +38,13 @@ namespace TaskingSolutions.Data.DataAccess
                     targetType.GetProperty(pair.Key).SetValue(this.Target, pair.Value);
             }
         }
+
+        public object PeekAtBoundValue(string propertyName)
+        {
+            _bindings.TryGetValue(propertyName, out object value);
+            return value;
+        }
+
     }
 
 }
