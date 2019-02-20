@@ -30,6 +30,7 @@ namespace TaskingSolutions.Data.DataAccess
         Job GetByPk(int Id);
         Job GetByPk(SqlCommand cmd, int Id);
         void Update(Job item);
+        void Update(List<Job> items);
         void Update(SqlCommand cmd, Job item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);

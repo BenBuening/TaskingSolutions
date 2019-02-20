@@ -1,8 +1,10 @@
-﻿namespace TaskingSolutions.Interfaces
+﻿using System;
+
+namespace TaskingSolutions.Interfaces
 {
     public interface IJob
     {
-        void Start(ISystemServices statCollector);
+        void Start(DateTime scheduledTime, ISystemServices statCollector);
 
     }
 }

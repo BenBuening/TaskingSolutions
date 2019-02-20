@@ -8,26 +8,12 @@ namespace TaskingSolutions.Data.DataAccess
 
     public partial interface IJobSchedulesAccessor
     {
-        IList<IOutputValueBinder> Insert(SqlCommand cmd, IList<JobSchedule> schedules);
         List<ScheduleAndJob> GetDueSchedules();
     }
 
 
     internal partial class JobSchedulesAccessor : IJobSchedulesAccessor
     {
-
-        public IList<IOutputValueBinder> Insert(SqlCommand cmd, IList<JobSchedule> schedules)
-        {
-            List<IOutputValueBinder> results = new List<IOutputValueBinder>(schedules.Count);
-
-            foreach (var schedule in schedules)
-                results.Add(Insert(cmd, schedule));
-
-            foreach (var binder in results)
-                binder.Commit();
-
-            return results;
-        }
 
         public List<ScheduleAndJob> GetDueSchedules()
         {
@@ -37,7 +23,9 @@ select
 	j.Name, j.IsSystemJob, j.CanRunConcurrent, j.QueueMultipleInstances, j.OnShutdown, j.JobQueuePriority, j.AlertsEmailList, j.AlertIfNotRunForXMinutes, j.DotNetType, j.IsDotNetTypeMissing
 from dbo.JobSchedules js
 join dbo.Jobs j on js.JobId = j.Id
-where js.NextTriggerTime <= GETUTCDATE();
+where j.IsDotNetTypeMissing = 0
+    and js.NextTriggerTime <= GETUTCDATE()
+order by j.JobQueuePriority, js.NextTriggerTime;
 ";
 
             using (SqlConnection con = new SqlConnection(this.ConnectionString))

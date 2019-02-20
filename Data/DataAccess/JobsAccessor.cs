@@ -35,7 +35,9 @@ namespace TaskingSolutions.Data.DataAccess
                         foreach (var schedule in schedules)
                             schedule.JobId = insertedId;
 
-                        results.AddRange(new JobSchedulesAccessor(this.ConnectionString).Insert(cmd, schedules));
+                        var schAcc = new JobSchedulesAccessor(this.ConnectionString);
+                        foreach (var schedule in schedules)
+                            results.Add(schAcc.Insert(cmd, schedule));
                     }
 
                     txn.Commit();

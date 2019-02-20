@@ -8,11 +8,11 @@ using TaskingSolutions.Interfaces;
 namespace TestAssembly
 {
     [JobName("Test Job")]
-    [ScheduleRepeatByMinutes("11/17/2018", 5)]
+    [ScheduleRepeatByMinutes("2/16/2019", 5)]
     [JobDefaultMetadata(true, true, OnShutdown = OnShutdownAction.FinishJob)]
     public class TestJob : IJob
     {
-        public void Start(ISystemServices statCollector)
+        public void Start(DateTime scheduledTime, ISystemServices statCollector)
         {
             statCollector.LogStat("Test Job Run", DateTime.Now.ToString());
         }

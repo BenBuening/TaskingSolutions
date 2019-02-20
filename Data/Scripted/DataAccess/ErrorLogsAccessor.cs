@@ -30,6 +30,7 @@ namespace TaskingSolutions.Data.DataAccess
         ErrorLog GetByPk(int Id);
         ErrorLog GetByPk(SqlCommand cmd, int Id);
         void Update(ErrorLog item);
+        void Update(List<ErrorLog> items);
         void Update(SqlCommand cmd, ErrorLog item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);

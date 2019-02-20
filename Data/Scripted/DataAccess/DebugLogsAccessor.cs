@@ -30,6 +30,7 @@ namespace TaskingSolutions.Data.DataAccess
         DebugLog GetByPk(int Id);
         DebugLog GetByPk(SqlCommand cmd, int Id);
         void Update(DebugLog item);
+        void Update(List<DebugLog> items);
         void Update(SqlCommand cmd, DebugLog item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);

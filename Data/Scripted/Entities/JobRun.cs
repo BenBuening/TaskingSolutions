@@ -19,7 +19,9 @@ namespace TaskingSolutions.Data.Entities
     {
         public int Id { get; set; }
         public int JobId { get; set; }
-        public DateTime? StartTime { get; set; }
+        public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
+        public bool IsErrored { get; set; }
+        public string Error { get; set; }
     }
 }

@@ -30,6 +30,7 @@ namespace TaskingSolutions.Data.DataAccess
         JobRunStat GetByPk(int Id);
         JobRunStat GetByPk(SqlCommand cmd, int Id);
         void Update(JobRunStat item);
+        void Update(List<JobRunStat> items);
         void Update(SqlCommand cmd, JobRunStat item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);

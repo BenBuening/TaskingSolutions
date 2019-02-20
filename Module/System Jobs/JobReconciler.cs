@@ -68,8 +68,6 @@ namespace TaskingSolutions.Module.System_Jobs
             job.DotNetType = jobInfo.FullName;
             job.Name = GetJobName(jobInfo);
             job.IsDotNetTypeMissing = false;
-            //if (schedules.Count > 0)
-            //    job.NextJobScheduleId = schedules.OrderBy(x => x.InitialTriggerTime).FirstOrDefault()?.JobScheduleId;
 
 
             _jobsAccessor.Create(job, schedules);
@@ -87,14 +85,18 @@ namespace TaskingSolutions.Module.System_Jobs
             return schedule;
         }
 
-        private void HandleMissingJobs(IEnumerable<Job> jobs)
+        private void HandleMissingJobs(ICollection<Job> jobs)
         {
+            List<Job> jobsToUpdate = new List<Job>(jobs.Count);
+
             foreach (var job in jobs)
                 if (!job.IsDotNetTypeMissing)
                 {
                     job.IsDotNetTypeMissing = true;
-                    _jobsAccessor.Update(job);
+                    jobsToUpdate.Add(job);
                 }
+
+            _jobsAccessor.Update(jobsToUpdate);
         }
 
         private string GetJobName(Type jobInfo)

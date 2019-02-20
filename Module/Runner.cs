@@ -5,9 +5,11 @@ using TaskingSolutions.Module.System_Jobs;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TaskingSolutions.Logging;
+using System.Collections.Generic;
 
 namespace TaskingSolutions.Module
 {
@@ -20,59 +22,62 @@ namespace TaskingSolutions.Module
         private Timer _checkJobsTimer;
         private DataAccessFactory _dataAccess;
         private EventWaitHandle _initGate;
-        
 
 
-        private Job SystemJob(string name)
-        {
-            var job = new Job();
-            job.Name = name;
-            job.IsSystemJob = true;
-            job.CanRunConcurrent = false;
-            job.JobQueuePriority = JobQueuePriority.High;
+        private readonly object _runningTaskLock = new object();
+        private readonly Dictionary<Task, Job> _runningTasks = new Dictionary<Task, Job>();
+        private readonly HashSet<int> _jobsBlockedFromRunning = new HashSet<int>();
 
-            return job;
-        }
 
         private void CheckJobsTimerTick(object state)
         {
-            // todo: try/catch. in catch, send notification of failure? reset timer
-            
             _logger.LogDebug("Runner.CheckJobsTimerTick - enter");
-            if (_checkJobsTimer != null)
+
+            try
             {
-                _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                if (_checkJobsTimer != null)
+                {
+                    _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
-                // get running jobs count
+                    var dueJobs = _dataAccess.GetJobSchedulesAccessor().GetDueSchedules();
 
-                // check db for newly triggered jobs
-                var due = _dataAccess.GetJobSchedulesAccessor().GetDueSchedules();
+                    foreach (var dueJob in dueJobs) // already ordered by priority and trigger time in sql
+                    {
+                        bool isBlocked;
+                        lock (_runningTaskLock)
+                            isBlocked = _jobsBlockedFromRunning.Contains(dueJob.Job.Id);
 
-                // split by priority, order by trigger time
-                // foreach priority, check canrunconcurrent vs running jobs count
-                // within each priority, if all canrunconcurrent, start jobs
+                        if (!isBlocked)
+                        {
+                            if (dueJob.Job.CanRunConcurrent)
+                                StartJob(dueJob);
 
+                            else // cannot run concurrent. wait for all running tasks to finish before starting this single task. 
+                            {       // the check jobs timer won't be reenabled to check for more until this single task completes
+                                Task[] tasks;
+                                lock (_runningTaskLock)
+                                    tasks = _runningTasks.Keys.ToArray();
 
-                //  update db for those jobs with new trigger times (trigger missed)
+                                Task.WaitAll(tasks);
+                                var task = StartJob(dueJob);
+                                task.ContinueWith(x => _checkJobsTimer?.Change(_timerPollingInterval, Timeout.Infinite));
 
-                // check db for next job to start. consider priority, threadedness, trigger time
+                                _logger.LogDebug("Runner.CheckJobsTimerTick - exit");
+                                return;
+                            }
+                        }
+                    }
 
-
-                // query job schedules for schedules with next trigger date <= now
-                // examine priority and multi-thread flags
-                // start any that can be started concurrently - if all running can be concurrent
-                // if not concurrent, then wait until all are finished before starting
-
-
-                // any time check if tasks are running, remove completed tasks. probably doenst matter the timeline as task.waitall will count finished tasks immediately
-
-
-
-
-                // if job started is not canrunconcurrent, set continuation on task to enable timer
-                // else re-enable timer here
+                    _checkJobsTimer.Change(_timerPollingInterval, Timeout.Infinite);
+                }
+            }
+            catch (Exception ex)
+            {
+                _dataAccess.GetErrorLogsAccessor().LogException(ex);
+                // todo: this is a critical method... send notification?
                 _checkJobsTimer.Change(_timerPollingInterval, Timeout.Infinite);
             }
+
             _logger.LogDebug("Runner.CheckJobsTimerTick - exit");
         }
 
@@ -102,6 +107,18 @@ namespace TaskingSolutions.Module
                     JobRunnerInitializer initializer = new JobRunnerInitializer();
                     initializer.WorkFolderPath = workFolderPath;
                     initializer.Start(null);
+
+                    // flag all uncompleted job runs as errors! dashboard will provide opportunity to reschedule
+                    var jobRunsAccessor = _dataAccess.GetJobRunsAccessor();
+                    var uncompletedRuns = jobRunsAccessor.GetAllUncompleted();
+                    foreach (var record in uncompletedRuns)
+                    {
+                        record.EndTime = DateTime.UtcNow;
+                        record.IsErrored = true;
+                        record.Error = "Job Run was aborted unexpectedly";
+                    }
+                    jobRunsAccessor.Update(uncompletedRuns);
+
 
                     _initGate.Set();
                     _checkJobsTimer.Change(0, Timeout.Infinite);
@@ -149,10 +166,10 @@ namespace TaskingSolutions.Module
         public void StopAfterCurrentJobsFinish()
         {
             _initGate.WaitOne();
-            //Task.WaitAll()
-
             _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
             _checkJobsTimer = null;
+
+            //Task.WaitAll()
 
 
             // check running job metadata for stop action (wait or abort)
@@ -162,40 +179,119 @@ namespace TaskingSolutions.Module
         }
 
 
-        private void StartJob(IJob job)
+        private Task StartJob(ScheduleAndJob startData)
         {
-            // track job somehow?
-            var t = Task.Factory.StartNew(StartJobThreaded, job);
-            // set continuation to stop tracking job?
+            lock (_runningTaskLock)
+            {
+                var task = Task.Factory.StartNew(StartJobThreaded, startData);
+                var cleanupTask = task.ContinueWith(JobEnded);
+
+                _runningTasks.Add(task, startData.Job);
+                if (!startData.Job.QueueMultipleInstances)
+                    _jobsBlockedFromRunning.Add(startData.Job.Id);
+                return task;
+            }
         }
 
-        void StartJobThreaded(object input)
+        private void JobEnded(Task task)
         {
-            // create job run?
+            lock (_runningTaskLock)
+            {
+                var job = _runningTasks[task];
+                _runningTasks.Remove(task);
+                if (!job.QueueMultipleInstances)
+                    _jobsBlockedFromRunning.Remove(job.Id);
+            }
+        }
 
-            //_dataAccess.GetJobRunsAccessor();
+        private void StartJobThreaded(object input)
+        {
+            IDataAccessFactory factory = new DataAccessFactory();
+            // todo: static constructor on factory? with con str?
 
-
-            JobMetadata data = (JobMetadata)input;
-            ISystemServices statCollector = new SystemServices(_dataAccess, data.JobRun.Id);
             try
             {
-                data.Job.Start(statCollector);
+                ScheduleAndJob data = (ScheduleAndJob)input;
+                SetNextTriggerDate(data.JobSchedule);
+
+                // take job schedule, calc next, new jobrun record & save
+                JobRun jobRun = new JobRun();
+                jobRun.JobId = data.Job.Id;
+                jobRun.StartTime = DateTime.UtcNow;
+
+                var jobrunsAccessor = factory.GetJobRunsAccessor();
+                jobrunsAccessor.SaveJobTriggered(data.JobSchedule, jobRun);
+
+
+                IJob jobInstance = (IJob)Activator.CreateInstance(Type.GetType(data.Job.DotNetType));
+                try
+                {
+                    jobInstance.Start(jobRun.StartTime, new SystemServices(factory, jobRun.Id));
+                }
+                catch (Exception ex)
+                {
+                    jobRun.EndTime = DateTime.UtcNow;
+                    jobRun.IsErrored = true;
+                    jobRun.Error = ex.ToString();
+                    jobrunsAccessor.Update(jobRun);
+
+                    return;
+                }
+
+                // mark job run completed
+                jobRun.EndTime = DateTime.UtcNow;
+                jobrunsAccessor.Update(jobRun);
             }
             catch (Exception ex)
             {
-                statCollector.LogError(ex);
+                factory.GetErrorLogsAccessor().LogException(ex);
+            }
+        }
+
+        private void SetNextTriggerDate(JobSchedule schedule)
+        {
+            schedule.TimesTriggered += 1;
+            if (schedule.TimesToRecur.HasValue && schedule.TimesTriggered > schedule.TimesToRecur.Value)
+            {
+                schedule.NextTriggerTime = null;
+                return;
             }
 
+            switch (schedule.RecurrenceType)
+            {
+                case Data.RecurranceType.Daily:
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddDays(1.0);
+                    break;
+
+                case Data.RecurranceType.Weekly:
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddDays(7.0);
+                    break;
+
+                case Data.RecurranceType.Monthly:
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddMonths(1);
+                    break;
+
+                case Data.RecurranceType.Hourly:
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddHours(1.0);
+                    break;
+
+                case Data.RecurranceType.Minutely:
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddMinutes(1.0);
+                    break;
+
+                case Data.RecurranceType.Yearly:
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddYears(1);
+                    break;
+
+                case Data.RecurranceType.None:
+                default:
+                    schedule.NextTriggerTime = null;
+                    break;
+            }
+
+            if (schedule.RecurUntil.HasValue && schedule.NextTriggerTime.HasValue && schedule.NextTriggerTime.Value >= schedule.RecurUntil.Value)
+                schedule.NextTriggerTime = null;
         }
-
-
-        private class JobMetadata
-        {
-            public IJob Job { get; set; }
-            public JobRun JobRun { get; set; }
-        }
-
 
 
 

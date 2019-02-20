@@ -30,6 +30,7 @@ namespace TaskingSolutions.Data.DataAccess
         JobSchedule GetByPk(int Id);
         JobSchedule GetByPk(SqlCommand cmd, int Id);
         void Update(JobSchedule item);
+        void Update(List<JobSchedule> items);
         void Update(SqlCommand cmd, JobSchedule item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);

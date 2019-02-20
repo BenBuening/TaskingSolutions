@@ -17,33 +17,6 @@ namespace TaskingSolutions.Module
             _jobRunId = jobRunId;
         }
 
-        public void LogError(string message)
-        {
-            try
-            {
-                _dataAccess.GetErrorLogsAccessor().Insert(new ErrorLog() { Message = message });
-            }
-            catch { }
-        }
-
-        public void LogError(Exception ex)
-        {
-            try
-            {
-                _dataAccess.GetErrorLogsAccessor().Insert(new ErrorLog() { Exception = ex.ToString() });
-            }
-            catch { }
-        }
-
-        public void LogError(Exception ex, string additionalComment)
-        {
-            try
-            {
-                _dataAccess.GetErrorLogsAccessor().Insert(new ErrorLog() { Exception = ex.ToString(), Message = additionalComment });
-            }
-            catch { }
-        }
-
         public void LogStat(string key, string value)
         {
             try
@@ -52,7 +25,7 @@ namespace TaskingSolutions.Module
             }
             catch (Exception ex)
             {
-                LogError(ex, "Error trying to log a stat");
+                _dataAccess.GetErrorLogsAccessor().LogException("Error trying to log a stat", ex);
             }
         }
 
