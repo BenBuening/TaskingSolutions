@@ -22,12 +22,10 @@ namespace TaskingSolutions.Service
         private Runner _runner;
         private volatile Action _onStoppedFollowup;
         private Timer _watcherWorkTrigger;
-        private bool _isShuttingDown;
 
 
         private void UpdateJobsAssemblies(object state)
         {
-            _logger.LogDebug("JobRunnerService.UpdateJobsAssemblies - enter");
             try
             {
                 _watcher.EnableRaisingEvents = false;
@@ -58,7 +56,7 @@ namespace TaskingSolutions.Service
             catch (Exception ex)
             {
                 _logger.LogError(ex);
-                Stop();
+                throw;
             }
             _logger.LogDebug("JobRunnerService.UpdateJobsAssemblies - exit");
         }
@@ -75,12 +73,16 @@ namespace TaskingSolutions.Service
             EventWaitHandle handle = new EventWaitHandle(false, EventResetMode.ManualReset);
             _onStoppedFollowup = () => { _onStoppedFollowup = null; handle.Set(); };
 
-            if (isShutDown)
-                _runner.ShutDown();
-            else
-                _runner.Stop();
+            try
+            {
+                if (isShutDown)
+                    _runner.ShutDown();
+                else
+                    _runner.Stop();
 
-            handle.WaitOne();
+                handle.WaitOne();
+            }
+            catch { }
         }
 
         private static void DirectoryCopy(string source, string dest, bool overwrite, bool copySubDirs)
@@ -132,7 +134,7 @@ namespace TaskingSolutions.Service
 
         protected override void OnStart(string[] args)
         {
-            _logger.LogDebug("JobRunnerService.OnStart - enter");
+            _logger.Log(LogLevel.Info, "JobRunnerService.OnStart - enter");
             try
             {
                 string rootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -167,12 +169,11 @@ namespace TaskingSolutions.Service
                 _logger.LogError("JobRunnerService.OnStart - exception", ex);
                 throw;
             }
-            _logger.LogDebug("JobRunnerService.OnStart - exit");
         }
 
         protected override void OnStop()
         {
-            _logger.LogDebug("JobRunnerService.OnStop - enter");
+            _logger.Log(LogLevel.Info, "JobRunnerService.OnStop - enter");
             try
             {
                 Stop(false);
@@ -182,12 +183,11 @@ namespace TaskingSolutions.Service
                 _logger.LogError("JobRunnerService.OnStop - exception", ex);
                 throw;
             }
-            _logger.LogDebug("JobRunnerService.OnStop - exit");
         }
 
         protected override void OnShutdown()
         {
-            _logger.LogDebug("JobRunnerService.OnShutdown - enter");
+            _logger.Log(LogLevel.Info, "JobRunnerService.OnShutdown - enter");
             try
             {
                 Stop(true);
@@ -197,11 +197,7 @@ namespace TaskingSolutions.Service
                 _logger.LogError("JobRunnerService.OnShutdown - exception", ex);
                 throw;
             }
-            _logger.LogDebug("JobRunnerService.OnShutdown - exit");
         }
-
-
-
 
 
         public JobRunnerService()

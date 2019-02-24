@@ -3,7 +3,7 @@ using System.IO;
 
 namespace TaskingSolutions.Logging
 {
-    public class FileLogger
+    public class FileLogger : ILogger
     {
 
         public string LogFilePath { get; set; }

@@ -32,7 +32,7 @@ namespace TaskingSolutions.Data.DataAccess
                         cmd.Transaction = txn;
 
                         result = Insert(cmd, run);
-                        new JobSchedulesAccessor(this.ConnectionString).Update(schedule);
+                        new JobSchedulesAccessor(this.ConnectionString).Update(cmd, schedule);
                     }
 
                     txn.Commit();

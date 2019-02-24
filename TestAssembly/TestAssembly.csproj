@@ -49,6 +49,10 @@
       <Project>{cf6f6d53-ab6a-482b-80e3-0aadaae18490}</Project>
       <Name>Interfaces</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TestAssemblyDependency\TestAssemblyDependency.csproj">
+      <Project>{49785b12-ac72-499e-b226-ec8c051f9f61}</Project>
+      <Name>TestAssemblyDependency</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -42,6 +42,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataAccess\DebugLogsAccessor.cs" />
     <Compile Include="DataAccess\JobRunsAccessor.cs" />
     <Compile Include="DataAccess\JobRunStatsAccessor.cs" />
     <Compile Include="DataAccess\JobSchedulesAccessor.cs" />

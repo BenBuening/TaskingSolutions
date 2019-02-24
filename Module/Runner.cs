@@ -1,15 +1,15 @@
-﻿using TaskingSolutions.Data.DataAccess;
-using TaskingSolutions.Data.Entities;
-using TaskingSolutions.Interfaces;
-using TaskingSolutions.Module.System_Jobs;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using TaskingSolutions.Data.DataAccess;
+using TaskingSolutions.Data.Entities;
+using TaskingSolutions.Interfaces;
 using TaskingSolutions.Logging;
-using System.Collections.Generic;
+using TaskingSolutions.Module.System_Jobs;
 
 namespace TaskingSolutions.Module
 {
@@ -22,190 +22,184 @@ namespace TaskingSolutions.Module
         private Timer _checkJobsTimer;
         private DataAccessFactory _dataAccess;
         private EventWaitHandle _initGate;
+        private Dictionary<string, Type> _jobTypesIndex;
 
+        private readonly object _checkJobsLock = new object();
+        private Task _checkJobsTask;
 
         private readonly object _runningTaskLock = new object();
         private readonly Dictionary<Task, Job> _runningTasks = new Dictionary<Task, Job>();
         private readonly HashSet<int> _jobsBlockedFromRunning = new HashSet<int>();
 
 
+        private void Initialize(object state)
+        {
+            _logger.LogDebug("Runner.Start.init - enter");
+            try
+            {
+                string workFolderPath = (string)state;
+
+                ValidateLicense();
+                InitDynamicAssemblies(workFolderPath);
+                new JobReconciler().Start();
+                InitFlagUncompletedJobRuns();
+
+                _initGate.Set();
+                _checkJobsTimer?.Change(0, Timeout.Infinite);
+                _logger.LogDebug("Runner.Start.init - exit");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Runner.Start.init - error", ex);
+                Stop(); // todo: may not be able to call stop from here... 
+            }
+        }
+
+        private void ValidateLicense()
+        {
+
+            /*
+            * 
+            * installer calls home & verifies license. calls home with machine unique id & returns hash of machine id and key
+            * on startup, validate hash
+            * 
+            * 
+            * */
+        }
+
+        private void InitDynamicAssemblies(string workFolderPath)
+        {
+            if (string.IsNullOrEmpty(workFolderPath))
+                throw new ArgumentException("WorkFolderPath not set", nameof(workFolderPath));
+
+            Type ijobType = typeof(IJob);
+            Type sysJobType = typeof(SystemJobAttribute);
+            Dictionary<string, Type> jobTypesIndex = new Dictionary<string, Type>();
+
+            foreach (var filePath in Directory.EnumerateFiles(workFolderPath, "*.dll", SearchOption.TopDirectoryOnly))
+                if (Path.GetFileName(filePath) != "JobRunnerInterfaces.dll")
+                {
+                    Assembly loaded = Assembly.LoadFrom(filePath);
+                    // apparently this style loading does not register all these types so they can be retrieved with type.gettype without having to manually intervene anyway... 
+
+                    // so, since that doesn't just work, i'm going to index all the jobs as they're loaded and look them up that way.
+                    var jobTypes = loaded.GetTypes().Where(x => x.IsClass && !x.IsAbstract && ijobType.IsAssignableFrom(x) && !x.IsDefined(sysJobType));
+                    foreach (var jobType in jobTypes)
+                        jobTypesIndex.Add(jobType.FullName, jobType);
+                }
+            _jobTypesIndex = jobTypesIndex;
+        }
+
+        private void InitFlagUncompletedJobRuns()
+        {
+            // flag all uncompleted job runs as errors! dashboard will provide opportunity to reschedule
+            var jobRunsAccessor = _dataAccess.GetJobRunsAccessor();
+            var uncompletedRuns = jobRunsAccessor.GetAllUncompleted();
+            foreach (var record in uncompletedRuns)
+            {
+                record.EndTime = DateTime.UtcNow;
+                record.IsErrored = true;
+                record.Error = "Job Runner service was aborted unexpectedly";
+            }
+            jobRunsAccessor.Update(uncompletedRuns);
+        }
+
         private void CheckJobsTimerTick(object state)
         {
             _logger.LogDebug("Runner.CheckJobsTimerTick - enter");
 
-            try
+            _checkJobsTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _logger.LogDebug("Runner.CheckJobsTimerTick - check lock");
+            lock (_checkJobsLock)
             {
-                if (_checkJobsTimer != null)
-                {
-                    _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
-
-                    var dueJobs = _dataAccess.GetJobSchedulesAccessor().GetDueSchedules();
-
-                    foreach (var dueJob in dueJobs) // already ordered by priority and trigger time in sql
-                    {
-                        bool isBlocked;
-                        lock (_runningTaskLock)
-                            isBlocked = _jobsBlockedFromRunning.Contains(dueJob.Job.Id);
-
-                        if (!isBlocked)
-                        {
-                            if (dueJob.Job.CanRunConcurrent)
-                                StartJob(dueJob);
-
-                            else // cannot run concurrent. wait for all running tasks to finish before starting this single task. 
-                            {       // the check jobs timer won't be reenabled to check for more until this single task completes
-                                Task[] tasks;
-                                lock (_runningTaskLock)
-                                    tasks = _runningTasks.Keys.ToArray();
-
-                                Task.WaitAll(tasks);
-                                var task = StartJob(dueJob);
-                                task.ContinueWith(x => _checkJobsTimer?.Change(_timerPollingInterval, Timeout.Infinite));
-
-                                _logger.LogDebug("Runner.CheckJobsTimerTick - exit");
-                                return;
-                            }
-                        }
-                    }
-
-                    _checkJobsTimer.Change(_timerPollingInterval, Timeout.Infinite);
-                }
-            }
-            catch (Exception ex)
-            {
-                _dataAccess.GetErrorLogsAccessor().LogException(ex);
-                // todo: this is a critical method... send notification?
-                _checkJobsTimer.Change(_timerPollingInterval, Timeout.Infinite);
+                _logger.LogDebug("Runner.CheckJobsTimerTick - enter lock");
+                _checkJobsTask = Task.Factory.StartNew(CheckJobs);
             }
 
             _logger.LogDebug("Runner.CheckJobsTimerTick - exit");
         }
 
-
-
-
-
-        public event EventHandler Stopped;
-
-
-        public Runner()
+        private void CheckJobs()
         {
-            _logger = new FileLogger(@"c:\_temp\JobRunnerModuleLog.txt");
-            _dataAccess = new DataAccessFactory();
-            _checkJobsTimer = new Timer(CheckJobsTimerTick, null, Timeout.Infinite, Timeout.Infinite);
-            _initGate = new EventWaitHandle(false, EventResetMode.ManualReset);
-        }
+            _logger.LogDebug("Runner.CheckJobs - enter");
 
-        public void Start(string workFolderPath)
-        {
-            _logger.LogDebug("Runner.Start - enter");
-            void init()
+            try
             {
-                _logger.LogDebug("Runner.Start.init - enter");
-                try
-                {
-                    JobRunnerInitializer initializer = new JobRunnerInitializer();
-                    initializer.WorkFolderPath = workFolderPath;
-                    initializer.Start(null);
+                var debugAccessor = _dataAccess.GetDebugLogsAccessor();
+                var scheduleAccessor = _dataAccess.GetJobSchedulesAccessor();
+                var dueJobs = scheduleAccessor.GetDueSchedules();
 
-                    // flag all uncompleted job runs as errors! dashboard will provide opportunity to reschedule
-                    var jobRunsAccessor = _dataAccess.GetJobRunsAccessor();
-                    var uncompletedRuns = jobRunsAccessor.GetAllUncompleted();
-                    foreach (var record in uncompletedRuns)
+                foreach (var dueJob in dueJobs) // already ordered by priority and trigger time in sql
+                {
+                    bool isBlocked;
+                    lock (_runningTaskLock)
+                        isBlocked = _jobsBlockedFromRunning.Contains(dueJob.Job.Id);
+
+                    if (isBlocked)
                     {
-                        record.EndTime = DateTime.UtcNow;
-                        record.IsErrored = true;
-                        record.Error = "Job Run was aborted unexpectedly";
+                        if (!dueJob.Job.QueueMultipleInstances)
+                            AdjustScheduleForPassedTriggers(dueJob.JobSchedule, dueJob.Job);
                     }
-                    jobRunsAccessor.Update(uncompletedRuns);
+                    else
+                    {
+                        if (dueJob.Job.CanRunConcurrent)
+                            StartJobThread(dueJob);
 
+                        else // run concurrent not allowed. wait for all running tasks to finish before starting this single task. 
+                        {       // the check jobs timer won't be reenabled to check for more until this single task completes
+                            Task[] tasks;
+                            _logger.LogDebug("Runner.CheckJobs - check lock");
+                            lock (_runningTaskLock)
+                            {
+                                _logger.LogDebug("Runner.CheckJobs - enter lock");
+                                tasks = _runningTasks.Keys.ToArray();
+                            }
 
-                    _initGate.Set();
-                    _checkJobsTimer.Change(0, Timeout.Infinite);
-                    _logger.LogDebug("Runner.Start.init - exit");
+                            Task.WaitAll(tasks);
+                            var task = StartJobThread(dueJob);
+                            task.ContinueWith(x => _checkJobsTimer?.Change(_timerPollingInterval, Timeout.Infinite));
+
+                            _logger.LogDebug("Runner.CheckJobs - exit");
+                            return;
+                        }
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError("Runner.Start.init - error", ex);
-                    _dataAccess.GetErrorLogsAccessor().LogException(ex);
-                    Stop();
-                }
+
+                _checkJobsTimer?.Change(_timerPollingInterval, Timeout.Infinite);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex);
+                // todo: this is a critical method... send notification?
+                _checkJobsTimer?.Change(_timerPollingInterval, Timeout.Infinite);
             }
 
-            new Task(init).Start();
-            _logger.LogDebug("Runner.Start - exit");
+            _logger.LogDebug("Runner.CheckJobs - exit");
         }
 
-        public void Stop()
+        private Task StartJobThread(ScheduleAndJob startData)
         {
-            _initGate.WaitOne();
+            _logger.LogDebug("Runner.StartJobThread - enter");
 
-            _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            _checkJobsTimer = null;
-
-            // disable timer
-            // check running job metadata for stop action (wait or abort)
-            //  use previous job data to deterimine if too long running for wait
-
-
-            this.Stopped?.Invoke(null, EventArgs.Empty);
-        }
-
-        public void ShutDown()
-        {
-            _initGate.WaitOne();
-
-            // call same logic as stop, but with shorter wait time
-        }
-
-        public void Dispose()
-        {
-            // same logic as stop
-        }
-
-        public void StopAfterCurrentJobsFinish()
-        {
-            _initGate.WaitOne();
-            _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            _checkJobsTimer = null;
-
-            //Task.WaitAll()
-
-
-            // check running job metadata for stop action (wait or abort)
-            //  use previous job data to deterimine if too long running for wait
-
-            this.Stopped?.Invoke(null, EventArgs.Empty);
-        }
-
-
-        private Task StartJob(ScheduleAndJob startData)
-        {
             lock (_runningTaskLock)
             {
-                var task = Task.Factory.StartNew(StartJobThreaded, startData);
+                var task = new Task(StartJob, startData);
                 var cleanupTask = task.ContinueWith(JobEnded);
 
                 _runningTasks.Add(task, startData.Job);
                 if (!startData.Job.QueueMultipleInstances)
                     _jobsBlockedFromRunning.Add(startData.Job.Id);
+
+                task.Start();
+                _logger.LogDebug("Runner.StartJobThread - exit");
                 return task;
             }
         }
 
-        private void JobEnded(Task task)
+        private void StartJob(object input)
         {
-            lock (_runningTaskLock)
-            {
-                var job = _runningTasks[task];
-                _runningTasks.Remove(task);
-                if (!job.QueueMultipleInstances)
-                    _jobsBlockedFromRunning.Remove(job.Id);
-            }
-        }
+            _logger.LogDebug("Runner.StartJob - enter");
 
-        private void StartJobThreaded(object input)
-        {
             IDataAccessFactory factory = new DataAccessFactory();
             // todo: static constructor on factory? with con str?
 
@@ -219,11 +213,17 @@ namespace TaskingSolutions.Module
                 jobRun.JobId = data.Job.Id;
                 jobRun.StartTime = DateTime.UtcNow;
 
+                if (!data.Job.QueueMultipleInstances)
+                    AdjustScheduleForPassedTriggers(data.JobSchedule, data.Job);
+
+
                 var jobrunsAccessor = factory.GetJobRunsAccessor();
                 jobrunsAccessor.SaveJobTriggered(data.JobSchedule, jobRun);
 
-
-                IJob jobInstance = (IJob)Activator.CreateInstance(Type.GetType(data.Job.DotNetType));
+                Type jobType = _jobTypesIndex[data.Job.DotNetType];
+                //Type jobType = Type.GetType(data.Job.DotNetType, AssemblyResolver, TypeResolver);
+                //Type jobType2 = Type.GetType("TestAssembly.TestJob,TestAssembly");
+                IJob jobInstance = (IJob)Activator.CreateInstance(jobType);
                 try
                 {
                     jobInstance.Start(jobRun.StartTime, new SystemServices(factory, jobRun.Id));
@@ -235,6 +235,7 @@ namespace TaskingSolutions.Module
                     jobRun.Error = ex.ToString();
                     jobrunsAccessor.Update(jobRun);
 
+                    _logger.LogDebug("Runner.StartJob - exit");
                     return;
                 }
 
@@ -244,12 +245,32 @@ namespace TaskingSolutions.Module
             }
             catch (Exception ex)
             {
-                factory.GetErrorLogsAccessor().LogException(ex);
+                _logger.LogError("Runner.StartJob - exception", ex);
             }
+
+            _logger.LogDebug("Runner.StartJob - exit");
+        }
+
+        private void JobEnded(Task task)
+        {
+            _logger.LogDebug("Runner.JobEnded - enter");
+
+            lock (_runningTaskLock)
+            {
+                var job = _runningTasks[task];
+                _runningTasks.Remove(task);
+                if (!job.QueueMultipleInstances)
+                    _jobsBlockedFromRunning.Remove(job.Id);
+            }
+
+            _logger.LogDebug("Runner.JobEnded - exit");
         }
 
         private void SetNextTriggerDate(JobSchedule schedule)
         {
+            if (!schedule.NextTriggerTime.HasValue)
+                return;
+
             schedule.TimesTriggered += 1;
             if (schedule.TimesToRecur.HasValue && schedule.TimesTriggered > schedule.TimesToRecur.Value)
             {
@@ -293,77 +314,99 @@ namespace TaskingSolutions.Module
                 schedule.NextTriggerTime = null;
         }
 
+        private Assembly AssemblyResolver(AssemblyName asmn)
+        {
+            return AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => x.FullName == asmn.FullName);
+        }
+
+        private Type TypeResolver(Assembly assembly, string typeName, bool b)
+        {
+            return assembly.GetType(typeName);
+        }
+
+        private void AdjustScheduleForPassedTriggers(JobSchedule schedule, Job job)
+        {
+            int jobRunsSkipped = 0;
+            while (schedule.NextTriggerTime.HasValue && schedule.NextTriggerTime.Value < DateTime.UtcNow)
+            {
+                jobRunsSkipped++;
+                SetNextTriggerDate(schedule);
+            }
+            _dataAccess.GetJobSchedulesAccessor().Update(schedule);
+            _logger.LogDebug($"{jobRunsSkipped} job runs skipped for job id = {job.Id} as there was one already queued or running");
+        }
 
 
 
+        public event EventHandler Stopped;
 
 
-        /*
-         * 
-         * in order for the file system watcher to be effective, i'll need to copy the dll files into another working directory so they arent locked while running the program.
-         * 
-         * in order to swap the dlls out at runtime, they need loaded in another appdomain
-         * 
-         * so, the bulk of this program needs built in a separate assembly that can be loaded in another appdomain, but this assembly has to control the filesystemwatcher
-         *      in order to be able to unload the old dlls at runtime and reload the new
-         * 
-         * communication between appdomains can be done via wcf named pipes or a MarshalByRefObject instantiated in the child appdomain and passed back to this one
-         * 
-         * 
-         * domain responsibilities:
-         *  service domain:
-         *      filesystemwatcher & copy from drop directory to working
-         *      manage child domain
-         *      
-         *  child domain:
-         *      load dlls from working directory
-         *      database
-         *      scheduler
-         *      runner
-         * 
-         *  unknown:
-         *      field api requests
-         * 
-         * */
+        public Runner()
+        {
+            _logger = new FileLogger(@"c:\_temp\JobRunnerModuleLog.txt");
+            _dataAccess = new DataAccessFactory();
+            _checkJobsTimer = new Timer(CheckJobsTimerTick, null, Timeout.Infinite, Timeout.Infinite);
+            _initGate = new EventWaitHandle(false, EventResetMode.ManualReset);
+        }
+
+        public void Start(string workFolderPath)
+        {
+            new Task(Initialize, workFolderPath).Start();
+        }
+
+        public void Stop()
+        {
+            _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            _checkJobsTimer = null;
+
+            _initGate.WaitOne();
 
 
 
+            // disable timer
+            // check running job metadata for stop action (wait or abort)
+            //  use previous job data to deterimine if too long running for wait
 
 
+            this.Stopped?.Invoke(null, EventArgs.Empty);
+        }
 
-        // new thread / timer?
-        // initial run:
-        //  start filesystemwatcher
-        //  check assemblies for jobs
-        //      cross-reference jobs db
-        //      index jobs by next trigger time
-        //      set timer for next trigger
+        public void ShutDown()
+        {
+            _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            _checkJobsTimer = null;
 
-        // catalog jobs
-        //  cross-reference db
-        //  update db with new (un-cache missing, but dont change db settings)
+            _initGate.WaitOne();
 
-        // queue a job
-        //  check
-        //      already active job
-        //      priority, multiplexing, etc
-        //  if ok, run job on new thread
-        //      need to track exceptions in the thread, i need to own the job spinup code on the other thread
-        //      use prior stats
+            // call same logic as stop, but with shorter wait time
+        }
 
+        public void Dispose()
+        {
+            // todo: same logic as ShutDown
+        }
 
-        // on timer tick
-        //  add item to queue
-        //      queue triggers runner-manager thread
-        //          runner-manager
-        //  eval next trigger time & update db
-        //      get next trigger time overall and set timer
+        public void StopAfterCurrentJobsFinish()
+        {
+            _logger.LogDebug("Runner.StopAfterCurrentJobsFinish - exit");
 
-        // on file watcher trigger
-        //  disable timer
-        //  catalog jobs
-        //  re-enable timer
+            _initGate.WaitOne();
 
+            Task[] tasks;
+            _logger.LogDebug("Runner.StopAfterCurrentJobsFinish - check lock");
+            lock (_runningTaskLock)
+            {
+                _logger.LogDebug("Runner.StopAfterCurrentJobsFinish - enter lock");
+                _checkJobsTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                _checkJobsTimer = null;
+                tasks = _runningTasks.Keys.ToArray();
+            }
+            Task.WaitAll(tasks);
+
+            this.Stopped?.Invoke(null, EventArgs.Empty);
+
+            _logger.LogDebug("Runner.StopAfterCurrentJobsFinish - exit");
+        }
 
     }
 }

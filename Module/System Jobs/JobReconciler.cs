@@ -14,14 +14,13 @@ namespace TaskingSolutions.Module.System_Jobs
 
         private IJobsAccessor _jobsAccessor;
 
-        private void HandleJobExists(Job job, Type jobInfo)
+        private void HandleJobExists(Job job, Type jobInfo, string jobName)
         {
             bool update = false;
 
-            var jobName = GetJobName(jobInfo);
-            if (job.Name != jobName)
+            if (job.DotNetType != jobInfo.FullName)
             {
-                job.Name = jobName;
+                job.DotNetType = jobInfo.FullName;
                 update = true;
             }
 
@@ -35,7 +34,7 @@ namespace TaskingSolutions.Module.System_Jobs
                 _jobsAccessor.Update(job);
         }
 
-        private void HandleNewJob(Type jobInfo)
+        private void HandleNewJob(Type jobInfo, string jobName)
         {
             List<JobSchedule> schedules = new List<JobSchedule>();
 
@@ -66,7 +65,7 @@ namespace TaskingSolutions.Module.System_Jobs
 
             Job job = new Job();
             job.DotNetType = jobInfo.FullName;
-            job.Name = GetJobName(jobInfo);
+            job.Name = jobName;
             job.IsDotNetTypeMissing = false;
 
 
@@ -99,11 +98,6 @@ namespace TaskingSolutions.Module.System_Jobs
             _jobsAccessor.Update(jobsToUpdate);
         }
 
-        private string GetJobName(Type jobInfo)
-        {
-            return jobInfo.GetCustomAttribute<JobNameAttribute>()?.JobName ?? jobInfo.Name;
-        }
-
         private List<Type> GetJobsFromLoadedAssemblies()
         {
             Type jobType = typeof(IJob);
@@ -124,17 +118,20 @@ namespace TaskingSolutions.Module.System_Jobs
         public void Start()
         {
             var diskJobs = GetJobsFromLoadedAssemblies();
-            var jobs = _jobsAccessor.GetAll().ToDictionary(x => x.DotNetType);
+            var jobs = _jobsAccessor.GetAll().ToDictionary(x => x.Name.ToLower());
 
             foreach (var jobInfo in diskJobs)
             {
-                if (jobs.TryGetValue(jobInfo.FullName, out Job job))
+                string jobName = jobInfo.GetCustomAttribute<JobNameAttribute>()?.JobName ?? jobInfo.FullName;
+                string jobNameAsKey = jobName.ToLower();
+
+                if (jobs.TryGetValue(jobNameAsKey, out Job job))
                 {
-                    jobs.Remove(jobInfo.FullName);
-                    HandleJobExists(job, jobInfo);
+                    jobs.Remove(jobNameAsKey);
+                    HandleJobExists(job, jobInfo, jobName);
                 }
                 else
-                    HandleNewJob(jobInfo);
+                    HandleNewJob(jobInfo, jobName);
             }
 
             HandleMissingJobs(jobs.Values);
