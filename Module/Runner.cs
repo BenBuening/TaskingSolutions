@@ -13,10 +13,12 @@ using TaskingSolutions.Module.System_Jobs;
 
 namespace TaskingSolutions.Module
 {
-    public class Runner : MarshalByRefObject, IDisposable
+    public class Runner : MarshalByRefObject
     {
 
         private const int _timerPollingInterval = 1000 * 60; // 60 seconds
+        private const int _stopWaitTimeout = 1000 * 60 * 2; // 2 minute
+        private const int _shutdownWaitTimeout = 1000 * 20; // 20 seconds
 
         private FileLogger _logger;
         private Timer _checkJobsTimer;
@@ -44,14 +46,17 @@ namespace TaskingSolutions.Module
                 new JobReconciler().Start();
                 InitFlagUncompletedJobRuns();
 
-                _initGate.Set();
                 _checkJobsTimer?.Change(0, Timeout.Infinite);
                 _logger.LogDebug("Runner.Start.init - exit");
             }
             catch (Exception ex)
             {
                 _logger.LogError("Runner.Start.init - error", ex);
-                Stop(); // todo: may not be able to call stop from here... 
+                Stop();
+            }
+            finally
+            {
+                _initGate.Set();
             }
         }
 
@@ -102,6 +107,8 @@ namespace TaskingSolutions.Module
                 record.Error = "Job Runner service was aborted unexpectedly";
             }
             jobRunsAccessor.Update(uncompletedRuns);
+
+            // todo: send emails about failed jobs?
         }
 
         private void CheckJobsTimerTick(object state)
@@ -201,7 +208,6 @@ namespace TaskingSolutions.Module
             _logger.LogDebug("Runner.StartJob - enter");
 
             IDataAccessFactory factory = new DataAccessFactory();
-            // todo: static constructor on factory? with con str?
 
             try
             {
@@ -220,10 +226,8 @@ namespace TaskingSolutions.Module
                 var jobrunsAccessor = factory.GetJobRunsAccessor();
                 jobrunsAccessor.SaveJobTriggered(data.JobSchedule, jobRun);
 
-                Type jobType = _jobTypesIndex[data.Job.DotNetType];
-                //Type jobType = Type.GetType(data.Job.DotNetType, AssemblyResolver, TypeResolver);
-                //Type jobType2 = Type.GetType("TestAssembly.TestJob,TestAssembly");
-                IJob jobInstance = (IJob)Activator.CreateInstance(jobType);
+
+                IJob jobInstance = (IJob)Activator.CreateInstance(_jobTypesIndex[data.Job.DotNetType]);
                 try
                 {
                     jobInstance.Start(jobRun.StartTime, new SystemServices(factory, jobRun.Id));
@@ -234,6 +238,8 @@ namespace TaskingSolutions.Module
                     jobRun.IsErrored = true;
                     jobRun.Error = ex.ToString();
                     jobrunsAccessor.Update(jobRun);
+
+                    // todo: send error email
 
                     _logger.LogDebug("Runner.StartJob - exit");
                     return;
@@ -332,8 +338,11 @@ namespace TaskingSolutions.Module
                 jobRunsSkipped++;
                 SetNextTriggerDate(schedule);
             }
-            _dataAccess.GetJobSchedulesAccessor().Update(schedule);
-            _logger.LogDebug($"{jobRunsSkipped} job runs skipped for job id = {job.Id} as there was one already queued or running");
+            if (jobRunsSkipped > 0)
+            {
+                _dataAccess.GetJobSchedulesAccessor().Update(schedule);
+                _logger.LogDebug($"{jobRunsSkipped} job runs skipped for job id = {job.Id} as there was one already queued or running");
+            }
         }
 
 
@@ -361,12 +370,14 @@ namespace TaskingSolutions.Module
 
             _initGate.WaitOne();
 
+            // check running job metadata for stop action
+            Task[] tasks;
+            lock (_runningTaskLock)
+                tasks = _runningTasks.Keys.ToArray();
+            Task.WaitAll(tasks.ToArray(), _stopWaitTimeout);
 
-
-            // disable timer
-            // check running job metadata for stop action (wait or abort)
-            //  use previous job data to deterimine if too long running for wait
-
+            // future enhancement:
+            //  use previous job runs data to deterimine if too long running for wait
 
             this.Stopped?.Invoke(null, EventArgs.Empty);
         }
@@ -378,12 +389,16 @@ namespace TaskingSolutions.Module
 
             _initGate.WaitOne();
 
-            // call same logic as stop, but with shorter wait time
-        }
+            // check running job metadata for stop action
+            Task[] tasks;
+            lock (_runningTaskLock)
+                tasks = _runningTasks.Keys.ToArray();
+            Task.WaitAll(tasks.ToArray(), _shutdownWaitTimeout);
 
-        public void Dispose()
-        {
-            // todo: same logic as ShutDown
+            // future enhancement:
+            //  use previous job runs data to deterimine if too long running for wait
+
+            this.Stopped?.Invoke(null, EventArgs.Empty);
         }
 
         public void StopAfterCurrentJobsFinish()
