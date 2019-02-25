@@ -1,7 +1,7 @@
 ﻿using System.Web;
 using System.Web.Mvc;
 
-namespace TaskingSolutionsDashboard
+namespace Dashboard
 {
     public class FilterConfig
     {

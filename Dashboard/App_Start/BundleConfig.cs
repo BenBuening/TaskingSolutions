@@ -1,7 +1,7 @@
 ﻿using System.Web;
 using System.Web.Optimization;
 
-namespace TaskingSolutionsDashboard
+namespace Dashboard
 {
     public class BundleConfig
     {
