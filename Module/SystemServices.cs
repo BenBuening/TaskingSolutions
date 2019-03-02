@@ -1,6 +1,5 @@
 ﻿using System;
 using TaskingSolutions.Data.DataAccess;
-using TaskingSolutions.Data.Entities;
 using TaskingSolutions.Interfaces;
 
 namespace TaskingSolutions.Module
@@ -19,14 +18,17 @@ namespace TaskingSolutions.Module
 
         public void LogStat(string key, string value)
         {
-            try
-            {
-                _dataAccess.GetJobRunStatsAccessor().Insert(_jobRunId, key, value);
-            }
-            catch (Exception ex)
-            {
-                _dataAccess.GetErrorLogsAccessor().LogException("Error trying to log a stat", ex);
-            }
+            _dataAccess.GetJobRunStatsAccessor().Insert(_jobRunId, key, value);
+        }
+
+        public void LogError(string message, Exception ex)
+        {
+            _dataAccess.GetJobRunErrorLogsAccessor().LogException(_jobRunId, message, ex);
+        }
+
+        public void LogError(Exception ex)
+        {
+            _dataAccess.GetJobRunErrorLogsAccessor().LogException(_jobRunId, ex);
         }
 
     }

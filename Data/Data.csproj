@@ -42,31 +42,31 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DataAccess\DebugLogsAccessor.cs" />
+    <Compile Include="DataAccess\SystemLogsAccessor.cs" />
     <Compile Include="DataAccess\JobRunsAccessor.cs" />
     <Compile Include="DataAccess\JobRunStatsAccessor.cs" />
     <Compile Include="DataAccess\JobSchedulesAccessor.cs" />
     <Compile Include="DataAccess\JobsAccessor.cs" />
-    <Compile Include="DataAccess\ErrorLogsAccessor.cs" />
+    <Compile Include="DataAccess\JobRunErrorLogsAccessor.cs" />
     <Compile Include="Entities\ScheduleAndJob.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RecurranceType.cs" />
     <Compile Include="Scripted\AccessorBase.cs" />
     <Compile Include="Scripted\DataAccessFactory.cs" />
-    <Compile Include="Scripted\DataAccess\DebugLogsAccessor.cs" />
-    <Compile Include="Scripted\DataAccess\ErrorLogsAccessor.cs" />
+    <Compile Include="Scripted\DataAccess\JobRunErrorLogsAccessor.cs" />
     <Compile Include="Scripted\DataAccess\JobRunsAccessor.cs" />
     <Compile Include="Scripted\DataAccess\JobRunStatsAccessor.cs" />
     <Compile Include="Scripted\DataAccess\JobRunStatTypesAccessor.cs" />
     <Compile Include="Scripted\DataAccess\JobsAccessor.cs" />
     <Compile Include="Scripted\DataAccess\JobSchedulesAccessor.cs" />
-    <Compile Include="Scripted\Entities\DebugLog.cs" />
-    <Compile Include="Scripted\Entities\ErrorLog.cs" />
+    <Compile Include="Scripted\DataAccess\SystemLogsAccessor.cs" />
     <Compile Include="Scripted\Entities\Job.cs" />
     <Compile Include="Scripted\Entities\JobRun.cs" />
+    <Compile Include="Scripted\Entities\JobRunErrorLog.cs" />
     <Compile Include="Scripted\Entities\JobRunStat.cs" />
     <Compile Include="Scripted\Entities\JobRunStatType.cs" />
     <Compile Include="Scripted\Entities\JobSchedule.cs" />
+    <Compile Include="Scripted\Entities\SystemLog.cs" />
     <Compile Include="Scripted\EntityBase.cs" />
     <Compile Include="Scripted\OutputBinder.cs" />
   </ItemGroup>

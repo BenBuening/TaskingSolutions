@@ -19,33 +19,33 @@ namespace TaskingSolutions.Data.DataAccess
      */
 
 
-    public partial interface IErrorLogsAccessor
+    public partial interface IJobRunErrorLogsAccessor
     {
 
-        void Insert(ErrorLog item);
-        void Insert(List<ErrorLog> items);
-        IOutputValueBinder Insert(SqlCommand cmd, ErrorLog item);
-        List<ErrorLog> GetAll();
-        List<ErrorLog> GetAll(SqlCommand cmd);
-        ErrorLog GetByPk(int Id);
-        ErrorLog GetByPk(SqlCommand cmd, int Id);
-        void Update(ErrorLog item);
-        void Update(List<ErrorLog> items);
-        void Update(SqlCommand cmd, ErrorLog item);
+        void Insert(JobRunErrorLog item);
+        void Insert(List<JobRunErrorLog> items);
+        IOutputValueBinder Insert(SqlCommand cmd, JobRunErrorLog item);
+        List<JobRunErrorLog> GetAll();
+        List<JobRunErrorLog> GetAll(SqlCommand cmd);
+        JobRunErrorLog GetByPk(int Id);
+        JobRunErrorLog GetByPk(SqlCommand cmd, int Id);
+        void Update(JobRunErrorLog item);
+        void Update(List<JobRunErrorLog> items);
+        void Update(SqlCommand cmd, JobRunErrorLog item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);
-        void Upsert(ErrorLog item);
+        void Upsert(JobRunErrorLog item);
 
     }
 
 
-    internal partial class ErrorLogsAccessor : AccessorBase, IErrorLogsAccessor
+    internal partial class JobRunErrorLogsAccessor : AccessorBase, IJobRunErrorLogsAccessor
     {
 
-        public ErrorLogsAccessor(string connectionString) : base(connectionString) { }
+        public JobRunErrorLogsAccessor(string connectionString) : base(connectionString) { }
 
 
-        public void Insert(ErrorLog item)
+        public void Insert(JobRunErrorLog item)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -56,7 +56,7 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Insert(List<ErrorLog> items)
+        public void Insert(List<JobRunErrorLog> items)
         {
             List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
 
@@ -88,15 +88,16 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public IOutputValueBinder Insert(SqlCommand cmd, ErrorLog item)
+        public IOutputValueBinder Insert(SqlCommand cmd, JobRunErrorLog item)
         {
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[ErrorLogs] ([TimeStamp], [Message], [Exception]) OUTPUT Inserted.[Id] INTO @results VALUES (@TimeStamp, @Message, @Exception); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[JobRunErrorLogs] ([JobRunId], [TimeStamp], [Message], [Exception]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobRunId, @TimeStamp, @Message, @Exception); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
+            SqlParameter JobRunIdParam = cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.Int, item.JobRunId));
             SqlParameter TimeStampParam = cmd.Parameters.Add(Parameter("@TimeStamp", SqlDbType.DateTime2, item.TimeStamp));
             SqlParameter MessageParam = cmd.Parameters.Add(Parameter("@Message", SqlDbType.VarChar, item.Message));
             SqlParameter ExceptionParam = cmd.Parameters.Add(Parameter("@Exception", SqlDbType.VarChar, item.Exception));
@@ -108,23 +109,25 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        protected List<ErrorLog> ReadRecords(SqlDataReader reader)
+        protected List<JobRunErrorLog> ReadRecords(SqlDataReader reader)
         {
-            List<ErrorLog> result = new List<ErrorLog>();
+            List<JobRunErrorLog> result = new List<JobRunErrorLog>();
 
             if (reader.HasRows)
             {
                 int IdIndex = reader.GetOrdinal("Id");
+                int JobRunIdIndex = reader.GetOrdinal("JobRunId");
                 int TimeStampIndex = reader.GetOrdinal("TimeStamp");
                 int MessageIndex = reader.GetOrdinal("Message");
                 int ExceptionIndex = reader.GetOrdinal("Exception");
 
                 while (reader.Read())
                 {
-                    ErrorLog item = new ErrorLog();
+                    JobRunErrorLog item = new JobRunErrorLog();
 
                     item.IsNew = false;
                     item.Id = reader.GetInt32(IdIndex);
+                    item.JobRunId = reader.GetInt32(JobRunIdIndex);
                     item.TimeStamp = reader.GetDateTime(TimeStampIndex);
                     item.Message = reader.GetString(MessageIndex).Trim();
                     if (!reader.IsDBNull(ExceptionIndex)) item.Exception = reader.GetString(ExceptionIndex).Trim();
@@ -136,7 +139,7 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<ErrorLog> GetAll()
+        public List<JobRunErrorLog> GetAll()
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -147,9 +150,9 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public List<ErrorLog> GetAll(SqlCommand cmd)
+        public List<JobRunErrorLog> GetAll(SqlCommand cmd)
         {
-            cmd.CommandText = "SELECT * FROM [dbo].[ErrorLogs]";
+            cmd.CommandText = "SELECT * FROM [dbo].[JobRunErrorLogs]";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
 
@@ -157,7 +160,7 @@ namespace TaskingSolutions.Data.DataAccess
                 return ReadRecords(reader);
         }
 
-        public ErrorLog GetByPk(int Id)
+        public JobRunErrorLog GetByPk(int Id)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -168,21 +171,21 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public ErrorLog GetByPk(SqlCommand cmd, int Id)
+        public JobRunErrorLog GetByPk(SqlCommand cmd, int Id)
         {
-            cmd.CommandText = "SELECT * FROM [dbo].[ErrorLogs] WHERE [Id] = @Id";
+            cmd.CommandText = "SELECT * FROM [dbo].[JobRunErrorLogs] WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
 
             using (SqlDataReader reader = cmd.ExecuteReader())
             {
-                List<ErrorLog> result = ReadRecords(reader);
+                List<JobRunErrorLog> result = ReadRecords(reader);
                 return result.Count == 1 ? result[0] : null;
             }
         }
 
-        public void Update(ErrorLog item)
+        public void Update(JobRunErrorLog item)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -193,7 +196,7 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Update(List<ErrorLog> items)
+        public void Update(List<JobRunErrorLog> items)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -220,13 +223,14 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Update(SqlCommand cmd, ErrorLog item)
+        public void Update(SqlCommand cmd, JobRunErrorLog item)
         {
-            cmd.CommandText = "UPDATE [dbo].[ErrorLogs] SET [TimeStamp] = @TimeStamp, [Message] = @Message, [Exception] = @Exception WHERE [Id] = @Id";
+            cmd.CommandText = "UPDATE [dbo].[JobRunErrorLogs] SET [JobRunId] = @JobRunId, [TimeStamp] = @TimeStamp, [Message] = @Message, [Exception] = @Exception WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
             cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
+            cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.Int, item.JobRunId));
             cmd.Parameters.Add(Parameter("@TimeStamp", SqlDbType.DateTime2, item.TimeStamp));
             cmd.Parameters.Add(Parameter("@Message", SqlDbType.VarChar, item.Message));
             cmd.Parameters.Add(Parameter("@Exception", SqlDbType.VarChar, item.Exception));
@@ -261,7 +265,7 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Delete(SqlCommand cmd, int Id)
         {
-            cmd.CommandText = "DELETE FROM dbo.ErrorLogs WHERE [Id] = @Id";
+            cmd.CommandText = "DELETE FROM dbo.JobRunErrorLogs WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
@@ -270,7 +274,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.ExecuteNonQuery();
         }
 
-        public void Upsert(ErrorLog item)
+        public void Upsert(JobRunErrorLog item)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -284,7 +288,7 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Upsert(List<ErrorLog> items)
+        public void Upsert(List<JobRunErrorLog> items)
         {
             List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
 

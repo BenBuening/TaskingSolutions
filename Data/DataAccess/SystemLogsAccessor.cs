@@ -4,18 +4,18 @@ using TaskingSolutions.Data.Entities;
 namespace TaskingSolutions.Data.DataAccess
 {
 
-    public partial interface IDebugLogsAccessor
+    public partial interface ISystemLogsAccessor
     {
-        DebugLog LogMessage(string message);
+        SystemLog LogMessage(string message);
     }
 
 
-    internal partial class DebugLogsAccessor : IDebugLogsAccessor
+    internal partial class SystemLogsAccessor : ISystemLogsAccessor
     {
 
-        public DebugLog LogMessage(string message)
+        public SystemLog LogMessage(string message)
         {
-            DebugLog log = new DebugLog();
+            SystemLog log = new SystemLog();
             log.Timestamp = DateTime.UtcNow;
             log.Message = message;
 

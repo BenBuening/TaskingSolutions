@@ -18,13 +18,13 @@ namespace TaskingSolutions.Data.DataAccess
     public partial interface IDataAccessFactory
     {
 
-        IDebugLogsAccessor GetDebugLogsAccessor();
-        IErrorLogsAccessor GetErrorLogsAccessor();
+        IJobRunErrorLogsAccessor GetJobRunErrorLogsAccessor();
         IJobRunsAccessor GetJobRunsAccessor();
         IJobRunStatsAccessor GetJobRunStatsAccessor();
         IJobRunStatTypesAccessor GetJobRunStatTypesAccessor();
         IJobsAccessor GetJobsAccessor();
         IJobSchedulesAccessor GetJobSchedulesAccessor();
+        ISystemLogsAccessor GetSystemLogsAccessor();
 
     }
 
@@ -56,14 +56,9 @@ namespace TaskingSolutions.Data.DataAccess
          }
 
 
-        public IDebugLogsAccessor GetDebugLogsAccessor()
+        public IJobRunErrorLogsAccessor GetJobRunErrorLogsAccessor()
         {
-            return new DebugLogsAccessor(this.ConnectionString);
-        }
-
-        public IErrorLogsAccessor GetErrorLogsAccessor()
-        {
-            return new ErrorLogsAccessor(this.ConnectionString);
+            return new JobRunErrorLogsAccessor(this.ConnectionString);
         }
 
         public IJobRunsAccessor GetJobRunsAccessor()
@@ -89,6 +84,11 @@ namespace TaskingSolutions.Data.DataAccess
         public IJobSchedulesAccessor GetJobSchedulesAccessor()
         {
             return new JobSchedulesAccessor(this.ConnectionString);
+        }
+
+        public ISystemLogsAccessor GetSystemLogsAccessor()
+        {
+            return new SystemLogsAccessor(this.ConnectionString);
         }
 
     }

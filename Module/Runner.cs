@@ -98,15 +98,10 @@ namespace TaskingSolutions.Module
         private void InitFlagUncompletedJobRuns()
         {
             // flag all uncompleted job runs as errors! dashboard will provide opportunity to reschedule
-            var jobRunsAccessor = _dataAccess.GetJobRunsAccessor();
-            var uncompletedRuns = jobRunsAccessor.GetAllUncompleted();
+            var jobRunErrorsAccessor = _dataAccess.GetJobRunErrorLogsAccessor();
+            var uncompletedRuns = _dataAccess.GetJobRunsAccessor().GetAllUncompleted();
             foreach (var record in uncompletedRuns)
-            {
-                record.EndTime = DateTime.UtcNow;
-                record.IsErrored = true;
-                record.Error = "Job Runner service was aborted unexpectedly";
-            }
-            jobRunsAccessor.Update(uncompletedRuns);
+                jobRunErrorsAccessor.LogException(record.Id, "The Job Runner service was terminated before this job could finish. Please verify your data integrity.");
 
             // todo: send emails about failed jobs?
         }
@@ -132,7 +127,7 @@ namespace TaskingSolutions.Module
 
             try
             {
-                var debugAccessor = _dataAccess.GetDebugLogsAccessor();
+                var debugAccessor = _dataAccess.GetSystemLogsAccessor();
                 var scheduleAccessor = _dataAccess.GetJobSchedulesAccessor();
                 var dueJobs = scheduleAccessor.GetDueSchedules();
 
@@ -235,9 +230,7 @@ namespace TaskingSolutions.Module
                 catch (Exception ex)
                 {
                     jobRun.EndTime = DateTime.UtcNow;
-                    jobRun.IsErrored = true;
-                    jobRun.Error = ex.ToString();
-                    jobrunsAccessor.Update(jobRun);
+                    jobrunsAccessor.SaveJobErrored(jobRun, ex);
 
                     // todo: send error email
 

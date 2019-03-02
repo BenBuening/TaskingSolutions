@@ -93,15 +93,13 @@ namespace TaskingSolutions.Data.DataAccess
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[JobRuns] ([JobId], [StartTime], [EndTime], [IsErrored], [Error]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobId, @StartTime, @EndTime, @IsErrored, @Error); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[JobRuns] ([JobId], [StartTime], [EndTime]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobId, @StartTime, @EndTime); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
             SqlParameter JobIdParam = cmd.Parameters.Add(Parameter("@JobId", SqlDbType.Int, item.JobId));
             SqlParameter StartTimeParam = cmd.Parameters.Add(Parameter("@StartTime", SqlDbType.DateTime2, item.StartTime));
             SqlParameter EndTimeParam = cmd.Parameters.Add(Parameter("@EndTime", SqlDbType.DateTime2, item.EndTime));
-            SqlParameter IsErroredParam = cmd.Parameters.Add(Parameter("@IsErrored", SqlDbType.Bit, item.IsErrored));
-            SqlParameter ErrorParam = cmd.Parameters.Add(Parameter("@Error", SqlDbType.VarChar, item.Error));
 
             cmd.ExecuteNonQuery();
 
@@ -120,8 +118,6 @@ namespace TaskingSolutions.Data.DataAccess
                 int JobIdIndex = reader.GetOrdinal("JobId");
                 int StartTimeIndex = reader.GetOrdinal("StartTime");
                 int EndTimeIndex = reader.GetOrdinal("EndTime");
-                int IsErroredIndex = reader.GetOrdinal("IsErrored");
-                int ErrorIndex = reader.GetOrdinal("Error");
 
                 while (reader.Read())
                 {
@@ -132,8 +128,6 @@ namespace TaskingSolutions.Data.DataAccess
                     item.JobId = reader.GetInt32(JobIdIndex);
                     item.StartTime = reader.GetDateTime(StartTimeIndex);
                     if (!reader.IsDBNull(EndTimeIndex)) item.EndTime = reader.GetDateTime(EndTimeIndex);
-                    item.IsErrored = reader.GetBoolean(IsErroredIndex);
-                    if (!reader.IsDBNull(ErrorIndex)) item.Error = reader.GetString(ErrorIndex).Trim();
 
                     result.Add(item);
                 }
@@ -228,7 +222,7 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Update(SqlCommand cmd, JobRun item)
         {
-            cmd.CommandText = "UPDATE [dbo].[JobRuns] SET [JobId] = @JobId, [StartTime] = @StartTime, [EndTime] = @EndTime, [IsErrored] = @IsErrored, [Error] = @Error WHERE [Id] = @Id";
+            cmd.CommandText = "UPDATE [dbo].[JobRuns] SET [JobId] = @JobId, [StartTime] = @StartTime, [EndTime] = @EndTime WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
@@ -236,8 +230,6 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.Parameters.Add(Parameter("@JobId", SqlDbType.Int, item.JobId));
             cmd.Parameters.Add(Parameter("@StartTime", SqlDbType.DateTime2, item.StartTime));
             cmd.Parameters.Add(Parameter("@EndTime", SqlDbType.DateTime2, item.EndTime));
-            cmd.Parameters.Add(Parameter("@IsErrored", SqlDbType.Bit, item.IsErrored));
-            cmd.Parameters.Add(Parameter("@Error", SqlDbType.VarChar, item.Error));
 
             cmd.ExecuteNonQuery();
         }

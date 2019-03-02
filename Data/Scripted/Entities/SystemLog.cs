@@ -15,7 +15,7 @@ namespace TaskingSolutions.Data.Entities
      */
 
 
-    public partial class DebugLog : EntityBase
+    public partial class SystemLog : EntityBase
     {
         public int Id { get; set; }
         public DateTime Timestamp { get; set; }

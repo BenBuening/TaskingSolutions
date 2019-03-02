@@ -19,33 +19,33 @@ namespace TaskingSolutions.Data.DataAccess
      */
 
 
-    public partial interface IDebugLogsAccessor
+    public partial interface ISystemLogsAccessor
     {
 
-        void Insert(DebugLog item);
-        void Insert(List<DebugLog> items);
-        IOutputValueBinder Insert(SqlCommand cmd, DebugLog item);
-        List<DebugLog> GetAll();
-        List<DebugLog> GetAll(SqlCommand cmd);
-        DebugLog GetByPk(int Id);
-        DebugLog GetByPk(SqlCommand cmd, int Id);
-        void Update(DebugLog item);
-        void Update(List<DebugLog> items);
-        void Update(SqlCommand cmd, DebugLog item);
+        void Insert(SystemLog item);
+        void Insert(List<SystemLog> items);
+        IOutputValueBinder Insert(SqlCommand cmd, SystemLog item);
+        List<SystemLog> GetAll();
+        List<SystemLog> GetAll(SqlCommand cmd);
+        SystemLog GetByPk(int Id);
+        SystemLog GetByPk(SqlCommand cmd, int Id);
+        void Update(SystemLog item);
+        void Update(List<SystemLog> items);
+        void Update(SqlCommand cmd, SystemLog item);
         void Delete(int Id);
         void Delete(SqlCommand cmd, int Id);
-        void Upsert(DebugLog item);
+        void Upsert(SystemLog item);
 
     }
 
 
-    internal partial class DebugLogsAccessor : AccessorBase, IDebugLogsAccessor
+    internal partial class SystemLogsAccessor : AccessorBase, ISystemLogsAccessor
     {
 
-        public DebugLogsAccessor(string connectionString) : base(connectionString) { }
+        public SystemLogsAccessor(string connectionString) : base(connectionString) { }
 
 
-        public void Insert(DebugLog item)
+        public void Insert(SystemLog item)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -56,7 +56,7 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Insert(List<DebugLog> items)
+        public void Insert(List<SystemLog> items)
         {
             List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
 
@@ -88,12 +88,12 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public IOutputValueBinder Insert(SqlCommand cmd, DebugLog item)
+        public IOutputValueBinder Insert(SqlCommand cmd, SystemLog item)
         {
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[DebugLogs] ([Timestamp], [Message], [AdditionalData]) OUTPUT Inserted.[Id] INTO @results VALUES (@Timestamp, @Message, @AdditionalData); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[SystemLogs] ([Timestamp], [Message], [AdditionalData]) OUTPUT Inserted.[Id] INTO @results VALUES (@Timestamp, @Message, @AdditionalData); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
@@ -108,9 +108,9 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        protected List<DebugLog> ReadRecords(SqlDataReader reader)
+        protected List<SystemLog> ReadRecords(SqlDataReader reader)
         {
-            List<DebugLog> result = new List<DebugLog>();
+            List<SystemLog> result = new List<SystemLog>();
 
             if (reader.HasRows)
             {
@@ -121,13 +121,13 @@ namespace TaskingSolutions.Data.DataAccess
 
                 while (reader.Read())
                 {
-                    DebugLog item = new DebugLog();
+                    SystemLog item = new SystemLog();
 
                     item.IsNew = false;
                     item.Id = reader.GetInt32(IdIndex);
                     item.Timestamp = reader.GetDateTime(TimestampIndex);
                     item.Message = reader.GetString(MessageIndex).Trim();
-                    item.AdditionalData = reader.GetString(AdditionalDataIndex).Trim();
+                    if (!reader.IsDBNull(AdditionalDataIndex)) item.AdditionalData = reader.GetString(AdditionalDataIndex).Trim();
 
                     result.Add(item);
                 }
@@ -136,7 +136,7 @@ namespace TaskingSolutions.Data.DataAccess
             return result;
         }
 
-        public List<DebugLog> GetAll()
+        public List<SystemLog> GetAll()
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -147,9 +147,9 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public List<DebugLog> GetAll(SqlCommand cmd)
+        public List<SystemLog> GetAll(SqlCommand cmd)
         {
-            cmd.CommandText = "SELECT * FROM [dbo].[DebugLogs]";
+            cmd.CommandText = "SELECT * FROM [dbo].[SystemLogs]";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
 
@@ -157,7 +157,7 @@ namespace TaskingSolutions.Data.DataAccess
                 return ReadRecords(reader);
         }
 
-        public DebugLog GetByPk(int Id)
+        public SystemLog GetByPk(int Id)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -168,21 +168,21 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public DebugLog GetByPk(SqlCommand cmd, int Id)
+        public SystemLog GetByPk(SqlCommand cmd, int Id)
         {
-            cmd.CommandText = "SELECT * FROM [dbo].[DebugLogs] WHERE [Id] = @Id";
+            cmd.CommandText = "SELECT * FROM [dbo].[SystemLogs] WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
 
             using (SqlDataReader reader = cmd.ExecuteReader())
             {
-                List<DebugLog> result = ReadRecords(reader);
+                List<SystemLog> result = ReadRecords(reader);
                 return result.Count == 1 ? result[0] : null;
             }
         }
 
-        public void Update(DebugLog item)
+        public void Update(SystemLog item)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -193,7 +193,7 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Update(List<DebugLog> items)
+        public void Update(List<SystemLog> items)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -220,9 +220,9 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Update(SqlCommand cmd, DebugLog item)
+        public void Update(SqlCommand cmd, SystemLog item)
         {
-            cmd.CommandText = "UPDATE [dbo].[DebugLogs] SET [Timestamp] = @Timestamp, [Message] = @Message, [AdditionalData] = @AdditionalData WHERE [Id] = @Id";
+            cmd.CommandText = "UPDATE [dbo].[SystemLogs] SET [Timestamp] = @Timestamp, [Message] = @Message, [AdditionalData] = @AdditionalData WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
@@ -261,7 +261,7 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Delete(SqlCommand cmd, int Id)
         {
-            cmd.CommandText = "DELETE FROM dbo.DebugLogs WHERE [Id] = @Id";
+            cmd.CommandText = "DELETE FROM dbo.SystemLogs WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
@@ -270,7 +270,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.ExecuteNonQuery();
         }
 
-        public void Upsert(DebugLog item)
+        public void Upsert(SystemLog item)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -284,7 +284,7 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Upsert(List<DebugLog> items)
+        public void Upsert(List<SystemLog> items)
         {
             List<IOutputValueBinder> results = new List<IOutputValueBinder>(items.Count);
 
