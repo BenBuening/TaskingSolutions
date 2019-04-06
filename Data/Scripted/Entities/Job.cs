@@ -27,5 +27,6 @@ namespace TaskingSolutions.Data.Entities
         public decimal? AlertIfNotRunForXMinutes { get; set; }
         public string DotNetType { get; set; }
         public bool IsDotNetTypeMissing { get; set; }
+        public bool IsDisabled { get; set; }
     }
 }

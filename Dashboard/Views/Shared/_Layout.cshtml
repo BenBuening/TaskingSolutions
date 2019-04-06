@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tasking Solutions - @ViewBag.Title</title>
+    @RenderSection("head", false)
     @Styles.Render("~/Content/css")
     @Scripts.Render("~/bundles/modernizr")
 </head>
@@ -21,12 +22,12 @@
             <div class="navbar-collapse collapse">
                 <ul class="nav navbar-nav">
                     <li>@Html.ActionLink("Jobs", "Jobs", "Dashboard")</li>
-                    <li>@Html.ActionLink("Contact", "Contact", "Dashboard")</li>
+                    @*<li>@Html.ActionLink("Contact", "Contact", "Dashboard")</li>*@
                 </ul>
             </div>
         </div>
     </div>
-    <div class="container body-content">
+    <div style="margin-top:30px;" class="container body-content">
         @RenderBody()
         <hr />
         <footer>
@@ -36,6 +37,6 @@
 
     @Scripts.Render("~/bundles/jquery")
     @Scripts.Render("~/bundles/bootstrap")
-    @RenderSection("scripts", required: false)
+    @RenderSection("scripts", false)
 </body>
 </html>

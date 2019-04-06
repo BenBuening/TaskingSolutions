@@ -23,7 +23,7 @@ select
 	j.Name, j.IsSystemJob, j.CanRunConcurrent, j.QueueMultipleInstances, j.JobQueuePriority, j.AlertsEmailList, j.AlertIfNotRunForXMinutes, j.DotNetType, j.IsDotNetTypeMissing
 from dbo.JobSchedules js
 join dbo.Jobs j on js.JobId = j.Id
-where j.IsDotNetTypeMissing = 0
+where j.IsDotNetTypeMissing = 0 and j.IsDisabled = 0
     and js.NextTriggerTime <= GETUTCDATE()
 order by j.JobQueuePriority, js.NextTriggerTime;
 ";

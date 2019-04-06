@@ -82,13 +82,23 @@ namespace TaskingSolutions.Module
             Dictionary<string, Type> jobTypesIndex = new Dictionary<string, Type>();
 
             foreach (var filePath in Directory.EnumerateFiles(workFolderPath, "*.dll", SearchOption.TopDirectoryOnly))
-                if (Path.GetFileName(filePath) != "JobRunnerInterfaces.dll")
+                if (Path.GetFileName(filePath) != "TaskingSolutions.Interfaces.dll")
                 {
                     Assembly loaded = Assembly.LoadFrom(filePath);
                     // apparently this style loading does not register all these types so they can be retrieved with type.gettype without having to manually intervene anyway... 
 
                     // so, since that doesn't just work, i'm going to index all the jobs as they're loaded and look them up that way.
-                    var jobTypes = loaded.GetTypes().Where(x => x.IsClass && !x.IsAbstract && ijobType.IsAssignableFrom(x) && !x.IsDefined(sysJobType));
+                    List<Type> jobTypes = new List<Type>();
+                    foreach (var type in loaded.GetTypes())
+                    {
+                        bool isClass = type.IsClass;
+                        bool isNotAbstract = !type.IsAbstract;
+                        bool isIJob = ijobType.IsAssignableFrom(type);
+                        bool isNotSysJob = !type.IsDefined(sysJobType);
+                        if (isClass && isNotAbstract && isIJob && isNotSysJob)
+                            jobTypes.Add(type);
+                    }
+                    //var jobTypes = loaded.GetTypes().Where(x => x.IsClass && !x.IsAbstract && ijobType.IsAssignableFrom(x) && !x.IsDefined(sysJobType)).ToList();
                     foreach (var jobType in jobTypes)
                         jobTypesIndex.Add(jobType.FullName, jobType);
                 }
@@ -159,7 +169,7 @@ namespace TaskingSolutions.Module
 
                             Task.WaitAll(tasks);
                             var task = StartJobThread(dueJob);
-                            task.ContinueWith(x => _checkJobsTimer?.Change(_timerPollingInterval, Timeout.Infinite));
+                            task.ContinueWith(x => _checkJobsTimer?.Change(5000, Timeout.Infinite));
 
                             _logger.LogDebug("Runner.CheckJobs - exit");
                             return;

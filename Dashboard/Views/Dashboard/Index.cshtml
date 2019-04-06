@@ -1,4 +1,118 @@
-﻿@{
+﻿@model Dashboard.Models.DashboardModel
+@using Dashboard.Controllers
+@{
     ViewBag.Title = "Dashboard";
 }
 
+@helper Format(TimeSpan ts)
+{
+    <span>@Static.Format(ts)</span>
+}
+
+@section head
+{
+    <meta http-equiv="refresh" content="15">
+}
+
+<style>
+
+    .dash-head {
+        font-weight: bold;
+        font-size: large;
+    }
+
+    .dash-item {
+        padding: 1em;
+        margin-bottom: 4px;
+        border-style: solid;
+        border-width: 2px;
+        border-radius: 4px;
+    }
+
+    .dash-item-error {
+        border-color: red;
+        background-color: #FFDBDD;
+    }
+
+    .dash-item-upcoming {
+        border-color: darkgray;
+        background-color: lightgray;
+    }
+
+    .dash-item-running {
+        border-color: dodgerblue;
+        background-color: lightblue;
+    }
+
+    .dash-item-success {
+        border-color: green;
+        background-color: lightgreen;
+    }
+</style>
+
+<div class="row">
+
+    <div class="col-xs-12 col-md-6">
+
+        @if (Model.Running.Count > 0)
+        {
+            <div class="dash-item dash-head dash-item-running">
+                Running Schedules
+            </div>
+
+            foreach (var item in Model.Running)
+            {
+                <div class="dash-item dash-item-running">
+                    @item.JobName (@Format(DateTime.UtcNow - item.StartTime))
+                </div>
+            }
+        }
+
+        <div>
+
+            <div class="dash-item dash-head dash-item-upcoming">
+                Upcoming Schedules
+            </div>
+
+            @foreach (var item in Model.Upcoming)
+            {
+                <div class="dash-item dash-item-upcoming">
+                    @item.StartTime.ToString("yyyy-MM-dd HH:mm:ss") - @item.JobName @*jobname, time - if time has passed, put red icon next to time*@
+                </div>
+            }
+
+        </div>
+
+    </div>
+
+    <div class="col-xs-12 col-md-6">
+
+        <div class="dash-item dash-head dash-item-success">
+            Recently Completed Schedules
+        </div>
+
+        @foreach (var item in Model.RecentlyCompleted)
+        {
+            if (item.ErrorCount == 0)
+            {
+                <div class="dash-item dash-item-success">
+                    @string.Format("{0} ended at {1:yyyy-MM-dd HH:mm:ss} with a total run time of {2}", item.JobName, item.EndTime, Static.Format(item.EndTime.Value - item.StartTime))
+                </div>
+            }
+            else if (item.EndTime.HasValue)
+            {
+                <div class="dash-item dash-item-error">
+                    @string.Format("{0} ended at {1:yyyy-MM-dd HH:mm:ss} with {2} errors and a total run time of {3}", item.JobName, item.EndTime, item.ErrorCount, Static.Format(item.EndTime.Value - item.StartTime)) @*jobname, time, # errors, link to run details, tooltip with error messages*@
+                </div>
+            }
+            else
+            {
+                <div class="dash-item dash-item-error">
+                    @string.Format("{0} was prematurely aborted with {2} errors", item.JobName, item.EndTime, item.ErrorCount) @*jobname, time, # errors, link to run details, tooltip with error messages*@
+                </div>
+            }
+        }
+
+    </div>
+
+</div>

@@ -93,7 +93,7 @@ namespace TaskingSolutions.Data.DataAccess
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[Jobs] ([Name], [IsSystemJob], [CanRunConcurrent], [QueueMultipleInstances], [JobQueuePriority], [AlertsEmailList], [AlertIfNotRunForXMinutes], [DotNetType], [IsDotNetTypeMissing]) OUTPUT Inserted.[Id] INTO @results VALUES (@Name, @IsSystemJob, @CanRunConcurrent, @QueueMultipleInstances, @JobQueuePriority, @AlertsEmailList, @AlertIfNotRunForXMinutes, @DotNetType, @IsDotNetTypeMissing); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[Jobs] ([Name], [IsSystemJob], [CanRunConcurrent], [QueueMultipleInstances], [JobQueuePriority], [AlertsEmailList], [AlertIfNotRunForXMinutes], [DotNetType], [IsDotNetTypeMissing], [IsDisabled]) OUTPUT Inserted.[Id] INTO @results VALUES (@Name, @IsSystemJob, @CanRunConcurrent, @QueueMultipleInstances, @JobQueuePriority, @AlertsEmailList, @AlertIfNotRunForXMinutes, @DotNetType, @IsDotNetTypeMissing, @IsDisabled); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
@@ -106,6 +106,7 @@ namespace TaskingSolutions.Data.DataAccess
             SqlParameter AlertIfNotRunForXMinutesParam = cmd.Parameters.Add(Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
             SqlParameter DotNetTypeParam = cmd.Parameters.Add(Parameter("@DotNetType", SqlDbType.VarChar, item.DotNetType));
             SqlParameter IsDotNetTypeMissingParam = cmd.Parameters.Add(Parameter("@IsDotNetTypeMissing", SqlDbType.Bit, item.IsDotNetTypeMissing));
+            SqlParameter IsDisabledParam = cmd.Parameters.Add(Parameter("@IsDisabled", SqlDbType.Bit, item.IsDisabled));
 
             cmd.ExecuteNonQuery();
 
@@ -130,6 +131,7 @@ namespace TaskingSolutions.Data.DataAccess
                 int AlertIfNotRunForXMinutesIndex = reader.GetOrdinal("AlertIfNotRunForXMinutes");
                 int DotNetTypeIndex = reader.GetOrdinal("DotNetType");
                 int IsDotNetTypeMissingIndex = reader.GetOrdinal("IsDotNetTypeMissing");
+                int IsDisabledIndex = reader.GetOrdinal("IsDisabled");
 
                 while (reader.Read())
                 {
@@ -146,6 +148,7 @@ namespace TaskingSolutions.Data.DataAccess
                     if (!reader.IsDBNull(AlertIfNotRunForXMinutesIndex)) item.AlertIfNotRunForXMinutes = reader.GetDecimal(AlertIfNotRunForXMinutesIndex);
                     item.DotNetType = reader.GetString(DotNetTypeIndex).Trim();
                     item.IsDotNetTypeMissing = reader.GetBoolean(IsDotNetTypeMissingIndex);
+                    item.IsDisabled = reader.GetBoolean(IsDisabledIndex);
 
                     result.Add(item);
                 }
@@ -240,7 +243,7 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Update(SqlCommand cmd, Job item)
         {
-            cmd.CommandText = "UPDATE [dbo].[Jobs] SET [Name] = @Name, [IsSystemJob] = @IsSystemJob, [CanRunConcurrent] = @CanRunConcurrent, [QueueMultipleInstances] = @QueueMultipleInstances, [JobQueuePriority] = @JobQueuePriority, [AlertsEmailList] = @AlertsEmailList, [AlertIfNotRunForXMinutes] = @AlertIfNotRunForXMinutes, [DotNetType] = @DotNetType, [IsDotNetTypeMissing] = @IsDotNetTypeMissing WHERE [Id] = @Id";
+            cmd.CommandText = "UPDATE [dbo].[Jobs] SET [Name] = @Name, [IsSystemJob] = @IsSystemJob, [CanRunConcurrent] = @CanRunConcurrent, [QueueMultipleInstances] = @QueueMultipleInstances, [JobQueuePriority] = @JobQueuePriority, [AlertsEmailList] = @AlertsEmailList, [AlertIfNotRunForXMinutes] = @AlertIfNotRunForXMinutes, [DotNetType] = @DotNetType, [IsDotNetTypeMissing] = @IsDotNetTypeMissing, [IsDisabled] = @IsDisabled WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
@@ -254,6 +257,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.Parameters.Add(Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
             cmd.Parameters.Add(Parameter("@DotNetType", SqlDbType.VarChar, item.DotNetType));
             cmd.Parameters.Add(Parameter("@IsDotNetTypeMissing", SqlDbType.Bit, item.IsDotNetTypeMissing));
+            cmd.Parameters.Add(Parameter("@IsDisabled", SqlDbType.Bit, item.IsDisabled));
 
             cmd.ExecuteNonQuery();
         }
