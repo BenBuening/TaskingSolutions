@@ -27,13 +27,13 @@ namespace TaskingSolutions.Data.DataAccess
         IOutputValueBinder Insert(SqlCommand cmd, SystemLog item);
         List<SystemLog> GetAll();
         List<SystemLog> GetAll(SqlCommand cmd);
-        SystemLog GetByPk(int Id);
-        SystemLog GetByPk(SqlCommand cmd, int Id);
+        SystemLog GetByPk(long Id);
+        SystemLog GetByPk(SqlCommand cmd, long Id);
         void Update(SystemLog item);
         void Update(List<SystemLog> items);
         void Update(SqlCommand cmd, SystemLog item);
-        void Delete(int Id);
-        void Delete(SqlCommand cmd, int Id);
+        void Delete(long Id);
+        void Delete(SqlCommand cmd, long Id);
         void Upsert(SystemLog item);
 
     }
@@ -93,10 +93,10 @@ namespace TaskingSolutions.Data.DataAccess
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[SystemLogs] ([Timestamp], [Message], [AdditionalData]) OUTPUT Inserted.[Id] INTO @results VALUES (@Timestamp, @Message, @AdditionalData); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] BigInt); INSERT INTO [dbo].[SystemLogs] ([Timestamp], [Message], [AdditionalData]) OUTPUT Inserted.[Id] INTO @results VALUES (@Timestamp, @Message, @AdditionalData); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
+            SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.BigInt));
             SqlParameter TimestampParam = cmd.Parameters.Add(Parameter("@Timestamp", SqlDbType.DateTime2, item.Timestamp));
             SqlParameter MessageParam = cmd.Parameters.Add(Parameter("@Message", SqlDbType.VarChar, item.Message));
             SqlParameter AdditionalDataParam = cmd.Parameters.Add(Parameter("@AdditionalData", SqlDbType.VarChar, item.AdditionalData));
@@ -124,7 +124,7 @@ namespace TaskingSolutions.Data.DataAccess
                     SystemLog item = new SystemLog();
 
                     item.IsNew = false;
-                    item.Id = reader.GetInt32(IdIndex);
+                    item.Id = reader.GetInt64(IdIndex);
                     item.Timestamp = reader.GetDateTime(TimestampIndex);
                     item.Message = reader.GetString(MessageIndex).Trim();
                     if (!reader.IsDBNull(AdditionalDataIndex)) item.AdditionalData = reader.GetString(AdditionalDataIndex).Trim();
@@ -157,7 +157,7 @@ namespace TaskingSolutions.Data.DataAccess
                 return ReadRecords(reader);
         }
 
-        public SystemLog GetByPk(int Id)
+        public SystemLog GetByPk(long Id)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -168,12 +168,12 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public SystemLog GetByPk(SqlCommand cmd, int Id)
+        public SystemLog GetByPk(SqlCommand cmd, long Id)
         {
             cmd.CommandText = "SELECT * FROM [dbo].[SystemLogs] WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.BigInt, Id));
 
             using (SqlDataReader reader = cmd.ExecuteReader())
             {
@@ -226,7 +226,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.BigInt, item.Id));
             cmd.Parameters.Add(Parameter("@Timestamp", SqlDbType.DateTime2, item.Timestamp));
             cmd.Parameters.Add(Parameter("@Message", SqlDbType.VarChar, item.Message));
             cmd.Parameters.Add(Parameter("@AdditionalData", SqlDbType.VarChar, item.AdditionalData));
@@ -234,7 +234,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.ExecuteNonQuery();
         }
 
-        public void Delete(int Id)
+        public void Delete(long Id)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -259,13 +259,13 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Delete(SqlCommand cmd, int Id)
+        public void Delete(SqlCommand cmd, long Id)
         {
             cmd.CommandText = "DELETE FROM dbo.SystemLogs WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.BigInt, Id));
 
             cmd.ExecuteNonQuery();
         }

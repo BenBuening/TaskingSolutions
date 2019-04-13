@@ -93,14 +93,15 @@ namespace TaskingSolutions.Data.DataAccess
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[Jobs] ([Name], [IsSystemJob], [CanRunConcurrent], [AllowMultipleInstances], [JobQueuePriority], [AlertsEmailList], [AlertIfNotRunForXMinutes], [DotNetType], [IsDotNetTypeMissing], [IsDisabled]) OUTPUT Inserted.[Id] INTO @results VALUES (@Name, @IsSystemJob, @CanRunConcurrent, @AllowMultipleInstances, @JobQueuePriority, @AlertsEmailList, @AlertIfNotRunForXMinutes, @DotNetType, @IsDotNetTypeMissing, @IsDisabled); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[Jobs] ([Name], [IsSystemJob], [CanRunConcurrentlyWithOtherJobs], [AllowSimultaneousInstances], [QueueMultipleInstances], [JobQueuePriority], [AlertsEmailList], [AlertIfNotRunForXMinutes], [DotNetType], [IsDotNetTypeMissing], [IsDisabled]) OUTPUT Inserted.[Id] INTO @results VALUES (@Name, @IsSystemJob, @CanRunConcurrentlyWithOtherJobs, @AllowSimultaneousInstances, @QueueMultipleInstances, @JobQueuePriority, @AlertsEmailList, @AlertIfNotRunForXMinutes, @DotNetType, @IsDotNetTypeMissing, @IsDisabled); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
             SqlParameter NameParam = cmd.Parameters.Add(Parameter("@Name", SqlDbType.VarChar, item.Name));
             SqlParameter IsSystemJobParam = cmd.Parameters.Add(Parameter("@IsSystemJob", SqlDbType.Bit, item.IsSystemJob));
-            SqlParameter CanRunConcurrentParam = cmd.Parameters.Add(Parameter("@CanRunConcurrent", SqlDbType.Bit, item.CanRunConcurrent));
-            SqlParameter AllowMultipleInstancesParam = cmd.Parameters.Add(Parameter("@AllowMultipleInstances", SqlDbType.Bit, item.AllowMultipleInstances));
+            SqlParameter CanRunConcurrentlyWithOtherJobsParam = cmd.Parameters.Add(Parameter("@CanRunConcurrentlyWithOtherJobs", SqlDbType.Bit, item.CanRunConcurrentlyWithOtherJobs));
+            SqlParameter AllowSimultaneousInstancesParam = cmd.Parameters.Add(Parameter("@AllowSimultaneousInstances", SqlDbType.Bit, item.AllowSimultaneousInstances));
+            SqlParameter QueueMultipleInstancesParam = cmd.Parameters.Add(Parameter("@QueueMultipleInstances", SqlDbType.Bit, item.QueueMultipleInstances));
             SqlParameter JobQueuePriorityParam = cmd.Parameters.Add(Parameter("@JobQueuePriority", SqlDbType.TinyInt, (byte)item.JobQueuePriority));
             SqlParameter AlertsEmailListParam = cmd.Parameters.Add(Parameter("@AlertsEmailList", SqlDbType.VarChar, item.AlertsEmailList));
             SqlParameter AlertIfNotRunForXMinutesParam = cmd.Parameters.Add(Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));
@@ -124,8 +125,9 @@ namespace TaskingSolutions.Data.DataAccess
                 int IdIndex = reader.GetOrdinal("Id");
                 int NameIndex = reader.GetOrdinal("Name");
                 int IsSystemJobIndex = reader.GetOrdinal("IsSystemJob");
-                int CanRunConcurrentIndex = reader.GetOrdinal("CanRunConcurrent");
-                int AllowMultipleInstancesIndex = reader.GetOrdinal("AllowMultipleInstances");
+                int CanRunConcurrentlyWithOtherJobsIndex = reader.GetOrdinal("CanRunConcurrentlyWithOtherJobs");
+                int AllowSimultaneousInstancesIndex = reader.GetOrdinal("AllowSimultaneousInstances");
+                int QueueMultipleInstancesIndex = reader.GetOrdinal("QueueMultipleInstances");
                 int JobQueuePriorityIndex = reader.GetOrdinal("JobQueuePriority");
                 int AlertsEmailListIndex = reader.GetOrdinal("AlertsEmailList");
                 int AlertIfNotRunForXMinutesIndex = reader.GetOrdinal("AlertIfNotRunForXMinutes");
@@ -141,8 +143,9 @@ namespace TaskingSolutions.Data.DataAccess
                     item.Id = reader.GetInt32(IdIndex);
                     item.Name = reader.GetString(NameIndex).Trim();
                     item.IsSystemJob = reader.GetBoolean(IsSystemJobIndex);
-                    item.CanRunConcurrent = reader.GetBoolean(CanRunConcurrentIndex);
-                    item.AllowMultipleInstances = reader.GetBoolean(AllowMultipleInstancesIndex);
+                    item.CanRunConcurrentlyWithOtherJobs = reader.GetBoolean(CanRunConcurrentlyWithOtherJobsIndex);
+                    item.AllowSimultaneousInstances = reader.GetBoolean(AllowSimultaneousInstancesIndex);
+                    item.QueueMultipleInstances = reader.GetBoolean(QueueMultipleInstancesIndex);
                     item.JobQueuePriority = (TaskingSolutions.Interfaces.JobQueuePriority)reader.GetByte(JobQueuePriorityIndex);
                     if (!reader.IsDBNull(AlertsEmailListIndex)) item.AlertsEmailList = reader.GetString(AlertsEmailListIndex).Trim();
                     if (!reader.IsDBNull(AlertIfNotRunForXMinutesIndex)) item.AlertIfNotRunForXMinutes = reader.GetDecimal(AlertIfNotRunForXMinutesIndex);
@@ -243,15 +246,16 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Update(SqlCommand cmd, Job item)
         {
-            cmd.CommandText = "UPDATE [dbo].[Jobs] SET [Name] = @Name, [IsSystemJob] = @IsSystemJob, [CanRunConcurrent] = @CanRunConcurrent, [AllowMultipleInstances] = @AllowMultipleInstances, [JobQueuePriority] = @JobQueuePriority, [AlertsEmailList] = @AlertsEmailList, [AlertIfNotRunForXMinutes] = @AlertIfNotRunForXMinutes, [DotNetType] = @DotNetType, [IsDotNetTypeMissing] = @IsDotNetTypeMissing, [IsDisabled] = @IsDisabled WHERE [Id] = @Id";
+            cmd.CommandText = "UPDATE [dbo].[Jobs] SET [Name] = @Name, [IsSystemJob] = @IsSystemJob, [CanRunConcurrentlyWithOtherJobs] = @CanRunConcurrentlyWithOtherJobs, [AllowSimultaneousInstances] = @AllowSimultaneousInstances, [QueueMultipleInstances] = @QueueMultipleInstances, [JobQueuePriority] = @JobQueuePriority, [AlertsEmailList] = @AlertsEmailList, [AlertIfNotRunForXMinutes] = @AlertIfNotRunForXMinutes, [DotNetType] = @DotNetType, [IsDotNetTypeMissing] = @IsDotNetTypeMissing, [IsDisabled] = @IsDisabled WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
             cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
             cmd.Parameters.Add(Parameter("@Name", SqlDbType.VarChar, item.Name));
             cmd.Parameters.Add(Parameter("@IsSystemJob", SqlDbType.Bit, item.IsSystemJob));
-            cmd.Parameters.Add(Parameter("@CanRunConcurrent", SqlDbType.Bit, item.CanRunConcurrent));
-            cmd.Parameters.Add(Parameter("@AllowMultipleInstances", SqlDbType.Bit, item.AllowMultipleInstances));
+            cmd.Parameters.Add(Parameter("@CanRunConcurrentlyWithOtherJobs", SqlDbType.Bit, item.CanRunConcurrentlyWithOtherJobs));
+            cmd.Parameters.Add(Parameter("@AllowSimultaneousInstances", SqlDbType.Bit, item.AllowSimultaneousInstances));
+            cmd.Parameters.Add(Parameter("@QueueMultipleInstances", SqlDbType.Bit, item.QueueMultipleInstances));
             cmd.Parameters.Add(Parameter("@JobQueuePriority", SqlDbType.TinyInt, (byte)item.JobQueuePriority));
             cmd.Parameters.Add(Parameter("@AlertsEmailList", SqlDbType.VarChar, item.AlertsEmailList));
             cmd.Parameters.Add(Parameter("@AlertIfNotRunForXMinutes", SqlDbType.Decimal, item.AlertIfNotRunForXMinutes));

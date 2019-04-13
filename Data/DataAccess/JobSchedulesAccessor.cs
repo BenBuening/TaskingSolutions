@@ -20,7 +20,7 @@ namespace TaskingSolutions.Data.DataAccess
             string sql = @"
 select top(1)
 	js.Id, js.JobId, js.InitialTriggerTime, js.RecurrenceType, js.RecurrenceInterval, js.TimesToRecur, js.RecurUntil, TimesTriggered, js.NextTriggerTime,
-	j.Name, j.IsSystemJob, j.CanRunConcurrent, j.AllowMultipleInstances, j.JobQueuePriority, j.AlertsEmailList, j.AlertIfNotRunForXMinutes, j.DotNetType, j.IsDotNetTypeMissing
+	j.Name, j.IsSystemJob, j.CanRunConcurrentlyWithOtherJobs, j.AllowSimultaneousInstances, j.QueueMultipleInstances, j.JobQueuePriority, j.AlertsEmailList, j.AlertIfNotRunForXMinutes, j.DotNetType, j.IsDotNetTypeMissing
 from dbo.JobSchedules js
 join dbo.Jobs j on js.JobId = j.Id
 where j.IsDotNetTypeMissing = 0 and j.IsDisabled = 0
@@ -53,8 +53,9 @@ order by j.JobQueuePriority, js.NextTriggerTime;
 
                         int NameIndex = reader.GetOrdinal("Name");
                         int IsSystemJobIndex = reader.GetOrdinal("IsSystemJob");
-                        int CanRunConcurrentIndex = reader.GetOrdinal("CanRunConcurrent");
-                        int AllowMultipleInstancesIndex = reader.GetOrdinal("AllowMultipleInstances");
+                        int CanRunConcurrentlyWithOtherJobsIndex = reader.GetOrdinal("CanRunConcurrentlyWithOtherJobs");
+                        int AllowSimultaneousInstancesIndex = reader.GetOrdinal("AllowSimultaneousInstances");
+                        int QueueMultipleInstancesIndex = reader.GetOrdinal("QueueMultipleInstances");
                         int JobQueuePriorityIndex = reader.GetOrdinal("JobQueuePriority");
                         int AlertsEmailListIndex = reader.GetOrdinal("AlertsEmailList");
                         int AlertIfNotRunForXMinutesIndex = reader.GetOrdinal("AlertIfNotRunForXMinutes");
@@ -80,8 +81,9 @@ order by j.JobQueuePriority, js.NextTriggerTime;
                             job.Id = schedule.JobId;
                             job.Name = reader.GetString(NameIndex).Trim();
                             job.IsSystemJob = reader.GetBoolean(IsSystemJobIndex);
-                            job.CanRunConcurrent = reader.GetBoolean(CanRunConcurrentIndex);
-                            job.AllowMultipleInstances = reader.GetBoolean(AllowMultipleInstancesIndex);
+                            job.CanRunConcurrentlyWithOtherJobs = reader.GetBoolean(CanRunConcurrentlyWithOtherJobsIndex);
+                            job.AllowSimultaneousInstances = reader.GetBoolean(AllowSimultaneousInstancesIndex);
+                            job.QueueMultipleInstances = reader.GetBoolean(QueueMultipleInstancesIndex);
                             job.JobQueuePriority = (TaskingSolutions.Interfaces.JobQueuePriority)reader.GetByte(JobQueuePriorityIndex);
                             if (!reader.IsDBNull(AlertsEmailListIndex)) job.AlertsEmailList = reader.GetString(AlertsEmailListIndex).Trim();
                             if (!reader.IsDBNull(AlertIfNotRunForXMinutesIndex)) job.AlertIfNotRunForXMinutes = reader.GetDecimal(AlertIfNotRunForXMinutesIndex);

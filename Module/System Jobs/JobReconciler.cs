@@ -73,9 +73,10 @@ namespace TaskingSolutions.Module.System_Jobs
             {
                 job.AlertIfNotRunForXMinutes = jobDefaults.AlertIfNotRunForXMinutes;
                 job.AlertsEmailList = jobDefaults.AlertsEmailList;
-                job.CanRunConcurrent = jobDefaults.CanRunConcurrent;
+                job.CanRunConcurrentlyWithOtherJobs = jobDefaults.CanRunConcurrentlyWithOtherJobs;
                 job.JobQueuePriority = jobDefaults.JobQueuePriority;
-                job.AllowMultipleInstances = jobDefaults.AllowMultipleInstances;
+                job.AllowSimultaneousInstances = jobDefaults.AllowSimultaneousInstances;
+                job.QueueMultipleInstances = jobDefaults.QueueMultipleInstancesWhenNotSimultaneous;
                 //jobDefaults.OnShutdown
             }
 

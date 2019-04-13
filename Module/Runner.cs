@@ -16,17 +16,23 @@ namespace TaskingSolutions.Module
     public class Runner : MarshalByRefObject
     {
 
+        private class JobStartInfo
+        {
+            public Job Job { get; set; }
+            public DateTime TriggerTime { get; set; }
+        }
+
+
         private const int _timerPollingInterval = 1000 * 60; // 60 seconds
         private const int _stopWaitTimeout = 1000 * 60 * 2; // 2 minute
         private const int _shutdownWaitTimeout = 1000 * 20; // 20 seconds
 
-        private FileLogger _logger;
+        private readonly FileLogger _logger;
         private Timer _checkJobsTimer;
-        private DataAccessFactory _dataAccess;
-        private EventWaitHandle _initGate;
+        private readonly DataAccessFactory _dataAccess;
+        private readonly EventWaitHandle _initGate;
         private Dictionary<string, Type> _jobTypesIndex;
 
-        private readonly Dictionary<JobQueuePriority, int> _priorityRank = new Dictionary<JobQueuePriority, int>() { [JobQueuePriority.Low] = 0, [JobQueuePriority.Normal] = 1, [JobQueuePriority.High] = 2 };
         private readonly object _runningTaskLock = new object();
         private readonly Dictionary<Task, Job> _runningTasks = new Dictionary<Task, Job>();
         private readonly HashSet<int> _jobsBlockedFromRunning = new HashSet<int>();
@@ -142,12 +148,18 @@ namespace TaskingSolutions.Module
                     lock (_runningTaskLock)
                         isBlocked = _jobsBlockedFromRunning.Contains(dueJob.Job.Id);
 
-                    if (dueJob.Job.AllowMultipleInstances || !isBlocked)
+                    if (dueJob.Job.AllowSimultaneousInstances || !isBlocked)
                     {
-                        var jobTask = new Task(StartJob, dueJob);
+                        var jobTask = new Task(StartJob, new JobStartInfo() { Job = dueJob.Job, TriggerTime = dueJob.JobSchedule.NextTriggerTime.Value });
                         var endTask = jobTask.ContinueWith(JobEnded);
 
-                        if (dueJob.Job.CanRunConcurrent)
+                        if (dueJob.Job.QueueMultipleInstances)
+                            SetNextTriggerDate(dueJob.JobSchedule);
+                        else
+                            AdjustScheduleForPassedTriggers(dueJob.JobSchedule, dueJob.Job);
+                        scheduleAccessor.Update(dueJob.JobSchedule);
+
+                        if (dueJob.Job.CanRunConcurrentlyWithOtherJobs)
                         {
                             lock (_runningTaskLock)
                             {
@@ -159,7 +171,7 @@ namespace TaskingSolutions.Module
                         }
                         else
                         {
-                            endTask.ContinueWith(x => _checkJobsTimer?.Change(3000, Timeout.Infinite));
+                            endTask.ContinueWith(x => _checkJobsTimer?.Change(0, Timeout.Infinite));
 
                             Task[] tasks;
                             lock (_runningTaskLock)
@@ -180,7 +192,10 @@ namespace TaskingSolutions.Module
                     {
                         _logger.LogDebug($"Runner.CheckJobs - job was blocked ({dueJob.Job.Name})");
                         AdjustScheduleForPassedTriggers(dueJob.JobSchedule, dueJob.Job);
+                        scheduleAccessor.Update(dueJob.JobSchedule);
                     }
+
+                    dueJob = scheduleAccessor.GetNextDueSchedule();
                 }
 
                 _checkJobsTimer?.Change(_timerPollingInterval, Timeout.Infinite);
@@ -204,16 +219,14 @@ namespace TaskingSolutions.Module
 
             try
             {
-                ScheduleAndJob data = (ScheduleAndJob)input;
+                JobStartInfo data = (JobStartInfo)input;
 
                 // take job schedule, calc next, new jobrun record & save
                 JobRun jobRun = new JobRun();
                 jobRun.JobId = data.Job.Id;
-                jobRun.TriggerTime = data.JobSchedule.NextTriggerTime.Value;
+                jobRun.TriggerTime = data.TriggerTime;
                 jobRun.StartTime = DateTime.UtcNow;
-
-                SetNextTriggerDate(data.JobSchedule);
-                jobrunsAccessor.SaveJobTriggered(data.JobSchedule, jobRun);
+                jobrunsAccessor.Insert(jobRun);
 
 
                 IJob jobInstance = (IJob)Activator.CreateInstance(_jobTypesIndex[data.Job.DotNetType]);

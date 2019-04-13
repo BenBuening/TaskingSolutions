@@ -7,8 +7,8 @@ namespace TaskingSolutions.Data.DataAccess
     public partial interface IJobRunStatsAccessor
     {
 
-        void Insert(int jobRunId, string key, string value);
-        IOutputValueBinder Insert(SqlCommand cmd, int jobRunId, string key, string value);
+        void Insert(long jobRunId, string key, string value);
+        IOutputValueBinder Insert(SqlCommand cmd, long jobRunId, string key, string value);
 
     }
 
@@ -16,7 +16,7 @@ namespace TaskingSolutions.Data.DataAccess
     internal partial class JobRunStatsAccessor : IJobRunStatsAccessor
     {
 
-        public void Insert(int jobRunId, string key, string value)
+        public void Insert(long jobRunId, string key, string value)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -41,7 +41,7 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public IOutputValueBinder Insert(SqlCommand cmd, int jobRunId, string key, string value)
+        public IOutputValueBinder Insert(SqlCommand cmd, long jobRunId, string key, string value)
         {
 
             cmd.CommandText = @"
@@ -56,7 +56,7 @@ insert into [dbo].[JobRunStats] ([JobRunId], [JobRunStatTypeId], [Value]) values
 ";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            SqlParameter JobRunIdParam = cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.Int, jobRunId));
+            SqlParameter JobRunIdParam = cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.BigInt, jobRunId));
             SqlParameter DescriptionParam = cmd.Parameters.Add(Parameter("@Description", SqlDbType.VarChar, key));
             SqlParameter ValueParam = cmd.Parameters.Add(Parameter("@Value", SqlDbType.VarChar, value));
 

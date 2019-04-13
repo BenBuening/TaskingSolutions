@@ -17,7 +17,7 @@ namespace TaskingSolutions.Data.Entities
 
     public partial class SystemLog : EntityBase
     {
-        public int Id { get; set; }
+        public long Id { get; set; }
         public DateTime Timestamp { get; set; }
         public string Message { get; set; }
         public string AdditionalData { get; set; }

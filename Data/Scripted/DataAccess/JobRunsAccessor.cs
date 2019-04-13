@@ -27,13 +27,13 @@ namespace TaskingSolutions.Data.DataAccess
         IOutputValueBinder Insert(SqlCommand cmd, JobRun item);
         List<JobRun> GetAll();
         List<JobRun> GetAll(SqlCommand cmd);
-        JobRun GetByPk(int Id);
-        JobRun GetByPk(SqlCommand cmd, int Id);
+        JobRun GetByPk(long Id);
+        JobRun GetByPk(SqlCommand cmd, long Id);
         void Update(JobRun item);
         void Update(List<JobRun> items);
         void Update(SqlCommand cmd, JobRun item);
-        void Delete(int Id);
-        void Delete(SqlCommand cmd, int Id);
+        void Delete(long Id);
+        void Delete(SqlCommand cmd, long Id);
         void Upsert(JobRun item);
 
     }
@@ -93,10 +93,10 @@ namespace TaskingSolutions.Data.DataAccess
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[JobRuns] ([JobId], [StartTime], [EndTime], [TriggerTime]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobId, @StartTime, @EndTime, @TriggerTime); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] BigInt); INSERT INTO [dbo].[JobRuns] ([JobId], [StartTime], [EndTime], [TriggerTime]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobId, @StartTime, @EndTime, @TriggerTime); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
+            SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.BigInt));
             SqlParameter JobIdParam = cmd.Parameters.Add(Parameter("@JobId", SqlDbType.Int, item.JobId));
             SqlParameter StartTimeParam = cmd.Parameters.Add(Parameter("@StartTime", SqlDbType.DateTime2, item.StartTime));
             SqlParameter EndTimeParam = cmd.Parameters.Add(Parameter("@EndTime", SqlDbType.DateTime2, item.EndTime));
@@ -126,7 +126,7 @@ namespace TaskingSolutions.Data.DataAccess
                     JobRun item = new JobRun();
 
                     item.IsNew = false;
-                    item.Id = reader.GetInt32(IdIndex);
+                    item.Id = reader.GetInt64(IdIndex);
                     item.JobId = reader.GetInt32(JobIdIndex);
                     item.StartTime = reader.GetDateTime(StartTimeIndex);
                     if (!reader.IsDBNull(EndTimeIndex)) item.EndTime = reader.GetDateTime(EndTimeIndex);
@@ -160,7 +160,7 @@ namespace TaskingSolutions.Data.DataAccess
                 return ReadRecords(reader);
         }
 
-        public JobRun GetByPk(int Id)
+        public JobRun GetByPk(long Id)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -171,12 +171,12 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public JobRun GetByPk(SqlCommand cmd, int Id)
+        public JobRun GetByPk(SqlCommand cmd, long Id)
         {
             cmd.CommandText = "SELECT * FROM [dbo].[JobRuns] WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.BigInt, Id));
 
             using (SqlDataReader reader = cmd.ExecuteReader())
             {
@@ -229,7 +229,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.BigInt, item.Id));
             cmd.Parameters.Add(Parameter("@JobId", SqlDbType.Int, item.JobId));
             cmd.Parameters.Add(Parameter("@StartTime", SqlDbType.DateTime2, item.StartTime));
             cmd.Parameters.Add(Parameter("@EndTime", SqlDbType.DateTime2, item.EndTime));
@@ -238,7 +238,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.ExecuteNonQuery();
         }
 
-        public void Delete(int Id)
+        public void Delete(long Id)
         {
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
             {
@@ -263,13 +263,13 @@ namespace TaskingSolutions.Data.DataAccess
             }
         }
 
-        public void Delete(SqlCommand cmd, int Id)
+        public void Delete(SqlCommand cmd, long Id)
         {
             cmd.CommandText = "DELETE FROM dbo.JobRuns WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
-            cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, Id));
+            cmd.Parameters.Add(Parameter("@Id", SqlDbType.BigInt, Id));
 
             cmd.ExecuteNonQuery();
         }

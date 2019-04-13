@@ -17,8 +17,8 @@ namespace TaskingSolutions.Data.Entities
 
     public partial class JobRunStat : EntityBase
     {
-        public int Id { get; set; }
-        public int JobRunId { get; set; }
+        public long Id { get; set; }
+        public long JobRunId { get; set; }
         public int JobRunStatTypeId { get; set; }
         public string Value { get; set; }
     }

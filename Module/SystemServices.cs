@@ -8,9 +8,9 @@ namespace TaskingSolutions.Module
     {
 
         private IDataAccessFactory _dataAccess;
-        private readonly int _jobRunId;
+        private readonly long _jobRunId;
         
-        public SystemServices(IDataAccessFactory dataAccess, int jobRunId)
+        public SystemServices(IDataAccessFactory dataAccess, long jobRunId)
         {
             _dataAccess = dataAccess;
             _jobRunId = jobRunId;

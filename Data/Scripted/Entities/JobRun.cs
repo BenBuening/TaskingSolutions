@@ -17,7 +17,7 @@ namespace TaskingSolutions.Data.Entities
 
     public partial class JobRun : EntityBase
     {
-        public int Id { get; set; }
+        public long Id { get; set; }
         public int JobId { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }

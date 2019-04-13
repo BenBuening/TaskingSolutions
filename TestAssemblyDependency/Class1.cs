@@ -17,7 +17,8 @@ namespace TestAssemblyDependency
 
         public void DoSomething()
         {
-            Console.WriteLine("do something");
+            Console.WriteLine("waiting");
+            System.Threading.Thread.Sleep(3 * 60 * 1000);
         }
 
     }

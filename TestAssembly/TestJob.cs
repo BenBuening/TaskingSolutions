@@ -10,7 +10,7 @@ namespace TestAssembly
 {
     [JobName("Test Job")]
     [ScheduleRepeatByMinutes("2/16/2019", 2)]
-    [JobDefaultMetadata(true, true, OnShutdown = OnShutdownAction.FinishJob)]
+    [JobDefaultMetadata(true, false, false, OnShutdown = OnShutdownAction.FinishJob)]
     public class TestJob : IJob
     {
         public void Start(DateTime scheduledTime, ISystemServices statCollector)

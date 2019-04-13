@@ -6,16 +6,16 @@ namespace TaskingSolutions.Data.DataAccess
 
     public partial interface IJobRunErrorLogsAccessor
     {
-        JobRunErrorLog LogException(int jobRunId, string message);
-        JobRunErrorLog LogException(int jobRunId, Exception ex);
-        JobRunErrorLog LogException(int jobRunId, string message, Exception ex);
+        JobRunErrorLog LogException(long jobRunId, string message);
+        JobRunErrorLog LogException(long jobRunId, Exception ex);
+        JobRunErrorLog LogException(long jobRunId, string message, Exception ex);
     }
 
 
     internal partial class JobRunErrorLogsAccessor : IJobRunErrorLogsAccessor
     {
 
-        public JobRunErrorLog LogException(int jobRunId, string message)
+        public JobRunErrorLog LogException(long jobRunId, string message)
         {
             JobRunErrorLog log = new JobRunErrorLog();
             log.JobRunId = jobRunId;
@@ -27,7 +27,7 @@ namespace TaskingSolutions.Data.DataAccess
             return log;
         }
 
-        public JobRunErrorLog LogException(int jobRunId, Exception ex)
+        public JobRunErrorLog LogException(long jobRunId, Exception ex)
         {
             JobRunErrorLog log = new JobRunErrorLog();
             log.JobRunId = jobRunId;
@@ -40,7 +40,7 @@ namespace TaskingSolutions.Data.DataAccess
             return log;
         }
 
-        public JobRunErrorLog LogException(int jobRunId, string message, Exception ex)
+        public JobRunErrorLog LogException(long jobRunId, string message, Exception ex)
         {
             JobRunErrorLog log = new JobRunErrorLog();
             log.JobRunId = jobRunId;

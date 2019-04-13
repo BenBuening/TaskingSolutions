@@ -97,7 +97,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
-            SqlParameter JobRunIdParam = cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.Int, item.JobRunId));
+            SqlParameter JobRunIdParam = cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.BigInt, item.JobRunId));
             SqlParameter TimeStampParam = cmd.Parameters.Add(Parameter("@TimeStamp", SqlDbType.DateTime2, item.TimeStamp));
             SqlParameter MessageParam = cmd.Parameters.Add(Parameter("@Message", SqlDbType.VarChar, item.Message));
             SqlParameter ExceptionParam = cmd.Parameters.Add(Parameter("@Exception", SqlDbType.VarChar, item.Exception));
@@ -127,7 +127,7 @@ namespace TaskingSolutions.Data.DataAccess
 
                     item.IsNew = false;
                     item.Id = reader.GetInt32(IdIndex);
-                    item.JobRunId = reader.GetInt32(JobRunIdIndex);
+                    item.JobRunId = reader.GetInt64(JobRunIdIndex);
                     item.TimeStamp = reader.GetDateTime(TimeStampIndex);
                     item.Message = reader.GetString(MessageIndex).Trim();
                     if (!reader.IsDBNull(ExceptionIndex)) item.Exception = reader.GetString(ExceptionIndex).Trim();
@@ -230,7 +230,7 @@ namespace TaskingSolutions.Data.DataAccess
 
             cmd.Parameters.Clear();
             cmd.Parameters.Add(Parameter("@Id", SqlDbType.Int, item.Id));
-            cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.Int, item.JobRunId));
+            cmd.Parameters.Add(Parameter("@JobRunId", SqlDbType.BigInt, item.JobRunId));
             cmd.Parameters.Add(Parameter("@TimeStamp", SqlDbType.DateTime2, item.TimeStamp));
             cmd.Parameters.Add(Parameter("@Message", SqlDbType.VarChar, item.Message));
             cmd.Parameters.Add(Parameter("@Exception", SqlDbType.VarChar, item.Exception));

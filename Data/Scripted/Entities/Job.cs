@@ -20,8 +20,9 @@ namespace TaskingSolutions.Data.Entities
         public int Id { get; set; }
         public string Name { get; set; }
         public bool IsSystemJob { get; set; }
-        public bool CanRunConcurrent { get; set; }
-        public bool AllowMultipleInstances { get; set; }
+        public bool CanRunConcurrentlyWithOtherJobs { get; set; }
+        public bool AllowSimultaneousInstances { get; set; }
+        public bool QueueMultipleInstances { get; set; }
         public TaskingSolutions.Interfaces.JobQueuePriority JobQueuePriority { get; set; }
         public string AlertsEmailList { get; set; }
         public decimal? AlertIfNotRunForXMinutes { get; set; }

@@ -6,14 +6,16 @@ namespace TaskingSolutions.Interfaces
     public sealed class JobDefaultMetadataAttribute : Attribute
     {
 
-        public JobDefaultMetadataAttribute(bool canRunConcurrent, bool allowMultipleInstances)
+        public JobDefaultMetadataAttribute(bool canRunConcurrentlyWithOtherJobs, bool allowSimultaneousInstances, bool queueMultipleInstancesWhenNotSimultaneous)
         {
-            this.CanRunConcurrent = canRunConcurrent;
-            this.AllowMultipleInstances = allowMultipleInstances;
+            this.CanRunConcurrentlyWithOtherJobs = canRunConcurrentlyWithOtherJobs;
+            this.AllowSimultaneousInstances = allowSimultaneousInstances;
+            this.QueueMultipleInstancesWhenNotSimultaneous = queueMultipleInstancesWhenNotSimultaneous;
         }
 
-        public bool CanRunConcurrent { get; set; }
-        public bool AllowMultipleInstances { get; set; }
+        public bool CanRunConcurrentlyWithOtherJobs { get; set; }
+        public bool AllowSimultaneousInstances { get; set; }
+        public bool QueueMultipleInstancesWhenNotSimultaneous { get; set; }
         public OnShutdownAction OnShutdown { get; set; }
         public JobQueuePriority JobQueuePriority { get; set; }
         public string AlertsEmailList { get; set; }

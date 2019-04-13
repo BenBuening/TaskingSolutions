@@ -18,7 +18,7 @@ namespace TaskingSolutions.Data.Entities
     public partial class JobRunErrorLog : EntityBase
     {
         public int Id { get; set; }
-        public int JobRunId { get; set; }
+        public long JobRunId { get; set; }
         public DateTime TimeStamp { get; set; }
         public string Message { get; set; }
         public string Exception { get; set; }
