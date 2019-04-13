@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+﻿using System;
 using System.Data;
 using System.Data.SqlClient;
 using TaskingSolutions.Data.Entities;
@@ -8,23 +8,23 @@ namespace TaskingSolutions.Data.DataAccess
 
     public partial interface IJobSchedulesAccessor
     {
-        List<ScheduleAndJob> GetDueSchedules();
+        ScheduleAndJob GetNextDueSchedule();
     }
 
 
     internal partial class JobSchedulesAccessor : IJobSchedulesAccessor
     {
 
-        public List<ScheduleAndJob> GetDueSchedules()
+        public ScheduleAndJob GetNextDueSchedule()
         {
             string sql = @"
-select
+select top(1)
 	js.Id, js.JobId, js.InitialTriggerTime, js.RecurrenceType, js.RecurrenceInterval, js.TimesToRecur, js.RecurUntil, TimesTriggered, js.NextTriggerTime,
-	j.Name, j.IsSystemJob, j.CanRunConcurrent, j.QueueMultipleInstances, j.JobQueuePriority, j.AlertsEmailList, j.AlertIfNotRunForXMinutes, j.DotNetType, j.IsDotNetTypeMissing
+	j.Name, j.IsSystemJob, j.CanRunConcurrent, j.AllowMultipleInstances, j.JobQueuePriority, j.AlertsEmailList, j.AlertIfNotRunForXMinutes, j.DotNetType, j.IsDotNetTypeMissing
 from dbo.JobSchedules js
 join dbo.Jobs j on js.JobId = j.Id
 where j.IsDotNetTypeMissing = 0 and j.IsDisabled = 0
-    and js.NextTriggerTime <= GETUTCDATE()
+    and js.NextTriggerTime <= @checkTimeUtc
 order by j.JobQueuePriority, js.NextTriggerTime;
 ";
 
@@ -34,7 +34,9 @@ order by j.JobQueuePriority, js.NextTriggerTime;
                 con.Open();
                 cmd.CommandType = CommandType.Text;
 
-                List<ScheduleAndJob> result = new List<ScheduleAndJob>();
+                cmd.Parameters.Clear();
+                cmd.Parameters.Add(Parameter("@checkTimeUtc", SqlDbType.DateTime2, DateTime.UtcNow));
+
 
                 using (SqlDataReader reader = cmd.ExecuteReader())
                     if (reader.HasRows)
@@ -52,14 +54,14 @@ order by j.JobQueuePriority, js.NextTriggerTime;
                         int NameIndex = reader.GetOrdinal("Name");
                         int IsSystemJobIndex = reader.GetOrdinal("IsSystemJob");
                         int CanRunConcurrentIndex = reader.GetOrdinal("CanRunConcurrent");
-                        int QueueMultipleInstancesIndex = reader.GetOrdinal("QueueMultipleInstances");
+                        int AllowMultipleInstancesIndex = reader.GetOrdinal("AllowMultipleInstances");
                         int JobQueuePriorityIndex = reader.GetOrdinal("JobQueuePriority");
                         int AlertsEmailListIndex = reader.GetOrdinal("AlertsEmailList");
                         int AlertIfNotRunForXMinutesIndex = reader.GetOrdinal("AlertIfNotRunForXMinutes");
                         int DotNetTypeIndex = reader.GetOrdinal("DotNetType");
                         int IsDotNetTypeMissingIndex = reader.GetOrdinal("IsDotNetTypeMissing");
 
-                        while (reader.Read())
+                        if (reader.Read())
                         {
                             JobSchedule schedule = new JobSchedule();
                             schedule.IsNew = false;
@@ -79,21 +81,20 @@ order by j.JobQueuePriority, js.NextTriggerTime;
                             job.Name = reader.GetString(NameIndex).Trim();
                             job.IsSystemJob = reader.GetBoolean(IsSystemJobIndex);
                             job.CanRunConcurrent = reader.GetBoolean(CanRunConcurrentIndex);
-                            job.QueueMultipleInstances = reader.GetBoolean(QueueMultipleInstancesIndex);
+                            job.AllowMultipleInstances = reader.GetBoolean(AllowMultipleInstancesIndex);
                             job.JobQueuePriority = (TaskingSolutions.Interfaces.JobQueuePriority)reader.GetByte(JobQueuePriorityIndex);
                             if (!reader.IsDBNull(AlertsEmailListIndex)) job.AlertsEmailList = reader.GetString(AlertsEmailListIndex).Trim();
                             if (!reader.IsDBNull(AlertIfNotRunForXMinutesIndex)) job.AlertIfNotRunForXMinutes = reader.GetDecimal(AlertIfNotRunForXMinutesIndex);
                             job.DotNetType = reader.GetString(DotNetTypeIndex).Trim();
                             job.IsDotNetTypeMissing = reader.GetBoolean(IsDotNetTypeMissingIndex);
 
-                            result.Add(new ScheduleAndJob() { Job = job, JobSchedule = schedule });
+                            return new ScheduleAndJob() { Job = job, JobSchedule = schedule };
                         }
                     }
-
-                return result;
             }
+
+            return null;
         }
 
     }
-
 }

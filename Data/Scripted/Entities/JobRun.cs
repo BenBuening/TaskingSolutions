@@ -21,5 +21,6 @@ namespace TaskingSolutions.Data.Entities
         public int JobId { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
+        public DateTime TriggerTime { get; set; }
     }
 }

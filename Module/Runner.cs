@@ -26,9 +26,7 @@ namespace TaskingSolutions.Module
         private EventWaitHandle _initGate;
         private Dictionary<string, Type> _jobTypesIndex;
 
-        private readonly object _checkJobsLock = new object();
-        private Task _checkJobsTask;
-
+        private readonly Dictionary<JobQueuePriority, int> _priorityRank = new Dictionary<JobQueuePriority, int>() { [JobQueuePriority.Low] = 0, [JobQueuePriority.Normal] = 1, [JobQueuePriority.High] = 2 };
         private readonly object _runningTaskLock = new object();
         private readonly Dictionary<Task, Job> _runningTasks = new Dictionary<Task, Job>();
         private readonly HashSet<int> _jobsBlockedFromRunning = new HashSet<int>();
@@ -121,12 +119,7 @@ namespace TaskingSolutions.Module
             _logger.LogDebug("Runner.CheckJobsTimerTick - enter");
 
             _checkJobsTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            _logger.LogDebug("Runner.CheckJobsTimerTick - check lock");
-            lock (_checkJobsLock)
-            {
-                _logger.LogDebug("Runner.CheckJobsTimerTick - enter lock");
-                _checkJobsTask = Task.Factory.StartNew(CheckJobs);
-            }
+            Task.Factory.StartNew(CheckJobs);
 
             _logger.LogDebug("Runner.CheckJobsTimerTick - exit");
         }
@@ -139,41 +132,54 @@ namespace TaskingSolutions.Module
             {
                 var debugAccessor = _dataAccess.GetSystemLogsAccessor();
                 var scheduleAccessor = _dataAccess.GetJobSchedulesAccessor();
-                var dueJobs = scheduleAccessor.GetDueSchedules();
+                var dueJob = scheduleAccessor.GetNextDueSchedule();
 
-                foreach (var dueJob in dueJobs) // already ordered by priority and trigger time in sql
+                while (dueJob != null)
                 {
+                    _logger.LogDebug($"Runner.CheckJobs - job found ({dueJob.Job.Name})");
+
                     bool isBlocked;
                     lock (_runningTaskLock)
                         isBlocked = _jobsBlockedFromRunning.Contains(dueJob.Job.Id);
 
-                    if (isBlocked)
+                    if (dueJob.Job.AllowMultipleInstances || !isBlocked)
                     {
-                        if (!dueJob.Job.QueueMultipleInstances)
-                            AdjustScheduleForPassedTriggers(dueJob.JobSchedule, dueJob.Job);
+                        var jobTask = new Task(StartJob, dueJob);
+                        var endTask = jobTask.ContinueWith(JobEnded);
+
+                        if (dueJob.Job.CanRunConcurrent)
+                        {
+                            lock (_runningTaskLock)
+                            {
+                                _jobsBlockedFromRunning.Add(dueJob.Job.Id);
+                                _runningTasks.Add(jobTask, dueJob.Job);
+
+                                jobTask.Start();
+                            }
+                        }
+                        else
+                        {
+                            endTask.ContinueWith(x => _checkJobsTimer?.Change(3000, Timeout.Infinite));
+
+                            Task[] tasks;
+                            lock (_runningTaskLock)
+                                tasks = _runningTasks.Keys.ToArray();
+                            Task.WaitAll(tasks);
+
+                            lock (_runningTaskLock)
+                            {
+                                _jobsBlockedFromRunning.Add(dueJob.Job.Id);
+                                _runningTasks.Add(jobTask, dueJob.Job);
+
+                                jobTask.Start();
+                            }
+                            return; // without restarting check timer. that will happen on task end
+                        }
                     }
                     else
                     {
-                        if (dueJob.Job.CanRunConcurrent)
-                            StartJobThread(dueJob);
-
-                        else // run concurrent not allowed. wait for all running tasks to finish before starting this single task. 
-                        {       // the check jobs timer won't be reenabled to check for more until this single task completes
-                            Task[] tasks;
-                            _logger.LogDebug("Runner.CheckJobs - check lock");
-                            lock (_runningTaskLock)
-                            {
-                                _logger.LogDebug("Runner.CheckJobs - enter lock");
-                                tasks = _runningTasks.Keys.ToArray();
-                            }
-
-                            Task.WaitAll(tasks);
-                            var task = StartJobThread(dueJob);
-                            task.ContinueWith(x => _checkJobsTimer?.Change(5000, Timeout.Infinite));
-
-                            _logger.LogDebug("Runner.CheckJobs - exit");
-                            return;
-                        }
+                        _logger.LogDebug($"Runner.CheckJobs - job was blocked ({dueJob.Job.Name})");
+                        AdjustScheduleForPassedTriggers(dueJob.JobSchedule, dueJob.Job);
                     }
                 }
 
@@ -189,46 +195,24 @@ namespace TaskingSolutions.Module
             _logger.LogDebug("Runner.CheckJobs - exit");
         }
 
-        private Task StartJobThread(ScheduleAndJob startData)
-        {
-            _logger.LogDebug("Runner.StartJobThread - enter");
-
-            lock (_runningTaskLock)
-            {
-                var task = new Task(StartJob, startData);
-                var cleanupTask = task.ContinueWith(JobEnded);
-
-                _runningTasks.Add(task, startData.Job);
-                if (!startData.Job.QueueMultipleInstances)
-                    _jobsBlockedFromRunning.Add(startData.Job.Id);
-
-                task.Start();
-                _logger.LogDebug("Runner.StartJobThread - exit");
-                return task;
-            }
-        }
-
         private void StartJob(object input)
         {
             _logger.LogDebug("Runner.StartJob - enter");
 
             IDataAccessFactory factory = new DataAccessFactory();
+            var jobrunsAccessor = factory.GetJobRunsAccessor();
 
             try
             {
                 ScheduleAndJob data = (ScheduleAndJob)input;
-                SetNextTriggerDate(data.JobSchedule);
 
                 // take job schedule, calc next, new jobrun record & save
                 JobRun jobRun = new JobRun();
                 jobRun.JobId = data.Job.Id;
+                jobRun.TriggerTime = data.JobSchedule.NextTriggerTime.Value;
                 jobRun.StartTime = DateTime.UtcNow;
 
-                if (!data.Job.QueueMultipleInstances)
-                    AdjustScheduleForPassedTriggers(data.JobSchedule, data.Job);
-
-
-                var jobrunsAccessor = factory.GetJobRunsAccessor();
+                SetNextTriggerDate(data.JobSchedule);
                 jobrunsAccessor.SaveJobTriggered(data.JobSchedule, jobRun);
 
 
@@ -268,8 +252,7 @@ namespace TaskingSolutions.Module
             {
                 var job = _runningTasks[task];
                 _runningTasks.Remove(task);
-                if (!job.QueueMultipleInstances)
-                    _jobsBlockedFromRunning.Remove(job.Id);
+                _jobsBlockedFromRunning.Remove(job.Id);
             }
 
             _logger.LogDebug("Runner.JobEnded - exit");
@@ -286,31 +269,37 @@ namespace TaskingSolutions.Module
                 schedule.NextTriggerTime = null;
                 return;
             }
+            
+            if (!schedule.RecurrenceInterval.HasValue)
+            {
+                schedule.NextTriggerTime = null;
+                return;
+            }
 
             switch (schedule.RecurrenceType)
             {
                 case Data.RecurranceType.Daily:
-                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddDays(1.0);
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddDays(schedule.RecurrenceInterval.Value);
                     break;
 
                 case Data.RecurranceType.Weekly:
-                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddDays(7.0);
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddDays(7.0 * schedule.RecurrenceInterval.Value);
                     break;
 
                 case Data.RecurranceType.Monthly:
-                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddMonths(1);
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddMonths(schedule.RecurrenceInterval.Value);
                     break;
 
                 case Data.RecurranceType.Hourly:
-                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddHours(1.0);
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddHours(schedule.RecurrenceInterval.Value);
                     break;
 
                 case Data.RecurranceType.Minutely:
-                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddMinutes(1.0);
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddMinutes(schedule.RecurrenceInterval.Value);
                     break;
 
                 case Data.RecurranceType.Yearly:
-                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddYears(1);
+                    schedule.NextTriggerTime = schedule.NextTriggerTime.Value.AddYears(schedule.RecurrenceInterval.Value);
                     break;
 
                 case Data.RecurranceType.None:
@@ -321,16 +310,6 @@ namespace TaskingSolutions.Module
 
             if (schedule.RecurUntil.HasValue && schedule.NextTriggerTime.HasValue && schedule.NextTriggerTime.Value >= schedule.RecurUntil.Value)
                 schedule.NextTriggerTime = null;
-        }
-
-        private Assembly AssemblyResolver(AssemblyName asmn)
-        {
-            return AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(x => x.FullName == asmn.FullName);
-        }
-
-        private Type TypeResolver(Assembly assembly, string typeName, bool b)
-        {
-            return assembly.GetType(typeName);
         }
 
         private void AdjustScheduleForPassedTriggers(JobSchedule schedule, Job job)
@@ -344,7 +323,7 @@ namespace TaskingSolutions.Module
             if (jobRunsSkipped > 0)
             {
                 _dataAccess.GetJobSchedulesAccessor().Update(schedule);
-                _logger.LogDebug($"{jobRunsSkipped} job runs skipped for job id = {job.Id} as there was one already queued or running");
+                _logger.LogDebug($"{jobRunsSkipped} job runs skipped for job id = {job.Id} as there was one already running");
             }
         }
 

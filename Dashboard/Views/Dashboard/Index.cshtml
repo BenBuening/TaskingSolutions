@@ -11,7 +11,7 @@
 
 @section head
 {
-    <meta http-equiv="refresh" content="15">
+    <meta http-equiv="refresh" content="6">
 }
 
 <style>
@@ -19,13 +19,13 @@
     .dash-head {
         font-weight: bold;
         font-size: large;
+        border-style: solid;
+        border-width: 2px;
     }
 
     .dash-item {
         padding: 1em;
         margin-bottom: 4px;
-        border-style: solid;
-        border-width: 2px;
         border-radius: 4px;
     }
 
@@ -99,16 +99,16 @@
                     @string.Format("{0} ended at {1:yyyy-MM-dd HH:mm:ss} with a total run time of {2}", item.JobName, item.EndTime, Static.Format(item.EndTime.Value - item.StartTime))
                 </div>
             }
+            else if (item.WasAborted)
+            {
+                <div class="dash-item dash-item-error">
+                    @string.Format("{0} was aborted due to service shutdown or failure", item.JobName, item.EndTime, item.ErrorCount) @*jobname, time, # errors, link to run details, tooltip with error messages*@
+                </div>
+            }
             else if (item.EndTime.HasValue)
             {
                 <div class="dash-item dash-item-error">
                     @string.Format("{0} ended at {1:yyyy-MM-dd HH:mm:ss} with {2} errors and a total run time of {3}", item.JobName, item.EndTime, item.ErrorCount, Static.Format(item.EndTime.Value - item.StartTime)) @*jobname, time, # errors, link to run details, tooltip with error messages*@
-                </div>
-            }
-            else
-            {
-                <div class="dash-item dash-item-error">
-                    @string.Format("{0} was prematurely aborted with {2} errors", item.JobName, item.EndTime, item.ErrorCount) @*jobname, time, # errors, link to run details, tooltip with error messages*@
                 </div>
             }
         }

@@ -12,9 +12,9 @@ namespace TaskingSolutions.Module.System_Jobs
     internal class JobReconciler
     {
 
-        private IJobsAccessor _jobsAccessor;
+        private readonly IJobsAccessor _jobsAccessor;
 
-        private void HandleJobExists(Job job, Type jobInfo, string jobName)
+        private void HandleJobExists(Job job, Type jobInfo)
         {
             bool update = false;
 
@@ -67,6 +67,17 @@ namespace TaskingSolutions.Module.System_Jobs
             job.DotNetType = jobInfo.FullName;
             job.Name = jobName;
             job.IsDotNetTypeMissing = false;
+
+            var jobDefaults = jobInfo.GetCustomAttribute<JobDefaultMetadataAttribute>();
+            if (jobDefaults != null)
+            {
+                job.AlertIfNotRunForXMinutes = jobDefaults.AlertIfNotRunForXMinutes;
+                job.AlertsEmailList = jobDefaults.AlertsEmailList;
+                job.CanRunConcurrent = jobDefaults.CanRunConcurrent;
+                job.JobQueuePriority = jobDefaults.JobQueuePriority;
+                job.AllowMultipleInstances = jobDefaults.AllowMultipleInstances;
+                //jobDefaults.OnShutdown
+            }
 
 
             _jobsAccessor.Create(job, schedules);
@@ -128,7 +139,7 @@ namespace TaskingSolutions.Module.System_Jobs
                 if (jobs.TryGetValue(jobNameAsKey, out Job job))
                 {
                     jobs.Remove(jobNameAsKey);
-                    HandleJobExists(job, jobInfo, jobName);
+                    HandleJobExists(job, jobInfo);
                 }
                 else
                     HandleNewJob(jobInfo, jobName);

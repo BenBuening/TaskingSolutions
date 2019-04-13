@@ -117,16 +117,18 @@ select top (20)
 	j.Id as JobId,
 	j.[Name] as JobName,
 	r.StartTime,
-	r.EndTime,
-	isnull(counts.ErrorCount, 0) as ErrorCount
+	coalesce(r.EndTime, aborted.EndTime) as EndTime,
+	isnull(counts.ErrorCount, 0) as ErrorCount,
+	cast(case when aborted.JobRunId is null then 0 else 1 end as bit) as WasAborted
 
 from [dbo].[JobRuns] r
 join [dbo].[Jobs] j on r.JobId = j.Id
+left join (select l.JobRunId, l.[TimeStamp] as EndTime from [dbo].[JobRunErrorLogs] l where l.[Message] = 'The Job Runner service was terminated before this job could finish. Please verify your data integrity.') as aborted on r.Id = aborted.JobRunId
 left join (select l.JobRunId, count(*) as ErrorCount from [dbo].[JobRunErrorLogs] l group by l.JobRunId) as counts on r.Id = counts.JobRunId
 
-where r.EndTime is not null or counts.ErrorCount is not null
+where (r.EndTime is not null or counts.ErrorCount is not null)
 
-order by r.EndTime desc
+order by coalesce(r.EndTime, aborted.EndTime) desc
 ";
 
             using (SqlConnection con = new SqlConnection(this.ConnectionString))
@@ -145,6 +147,7 @@ order by r.EndTime desc
                         int StartTimeIndex = reader.GetOrdinal("StartTime");
                         int EndTimeIndex = reader.GetOrdinal("EndTime");
                         int ErrorCountIndex = reader.GetOrdinal("ErrorCount");
+                        int WasAbortedIndex = reader.GetOrdinal("WasAborted");
 
                         while (reader.Read())
                         {
@@ -155,6 +158,7 @@ order by r.EndTime desc
                             record.StartTime = reader.GetDateTime(StartTimeIndex);
                             if (!reader.IsDBNull(EndTimeIndex)) record.EndTime = reader.GetDateTime(EndTimeIndex);
                             record.ErrorCount = reader.GetInt32(ErrorCountIndex);
+                            record.WasAborted = reader.GetBoolean(WasAbortedIndex);
 
                             result.Add(record);
                         }

@@ -9,5 +9,6 @@ namespace TaskingSolutions.Data.Entities
         public DateTime StartTime { get; set; }
         public DateTime? EndTime { get; set; }
         public int? ErrorCount { get; set; }
+        public bool WasAborted { get; set; }
     }
 }

@@ -93,13 +93,14 @@ namespace TaskingSolutions.Data.DataAccess
 
             OutputValueBinder result = new OutputValueBinder(item);
 
-            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[JobRuns] ([JobId], [StartTime], [EndTime]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobId, @StartTime, @EndTime); SELECT @Id = [Id] FROM @results;";
+            cmd.CommandText = "DECLARE @results TABLE ([Id] Int); INSERT INTO [dbo].[JobRuns] ([JobId], [StartTime], [EndTime], [TriggerTime]) OUTPUT Inserted.[Id] INTO @results VALUES (@JobId, @StartTime, @EndTime, @TriggerTime); SELECT @Id = [Id] FROM @results;";
             cmd.CommandType = CommandType.Text;
             cmd.Parameters.Clear();
             SqlParameter IdParam = cmd.Parameters.Add(OutputParameter("@Id", SqlDbType.Int));
             SqlParameter JobIdParam = cmd.Parameters.Add(Parameter("@JobId", SqlDbType.Int, item.JobId));
             SqlParameter StartTimeParam = cmd.Parameters.Add(Parameter("@StartTime", SqlDbType.DateTime2, item.StartTime));
             SqlParameter EndTimeParam = cmd.Parameters.Add(Parameter("@EndTime", SqlDbType.DateTime2, item.EndTime));
+            SqlParameter TriggerTimeParam = cmd.Parameters.Add(Parameter("@TriggerTime", SqlDbType.DateTime2, item.TriggerTime));
 
             cmd.ExecuteNonQuery();
 
@@ -118,6 +119,7 @@ namespace TaskingSolutions.Data.DataAccess
                 int JobIdIndex = reader.GetOrdinal("JobId");
                 int StartTimeIndex = reader.GetOrdinal("StartTime");
                 int EndTimeIndex = reader.GetOrdinal("EndTime");
+                int TriggerTimeIndex = reader.GetOrdinal("TriggerTime");
 
                 while (reader.Read())
                 {
@@ -128,6 +130,7 @@ namespace TaskingSolutions.Data.DataAccess
                     item.JobId = reader.GetInt32(JobIdIndex);
                     item.StartTime = reader.GetDateTime(StartTimeIndex);
                     if (!reader.IsDBNull(EndTimeIndex)) item.EndTime = reader.GetDateTime(EndTimeIndex);
+                    item.TriggerTime = reader.GetDateTime(TriggerTimeIndex);
 
                     result.Add(item);
                 }
@@ -222,7 +225,7 @@ namespace TaskingSolutions.Data.DataAccess
 
         public void Update(SqlCommand cmd, JobRun item)
         {
-            cmd.CommandText = "UPDATE [dbo].[JobRuns] SET [JobId] = @JobId, [StartTime] = @StartTime, [EndTime] = @EndTime WHERE [Id] = @Id";
+            cmd.CommandText = "UPDATE [dbo].[JobRuns] SET [JobId] = @JobId, [StartTime] = @StartTime, [EndTime] = @EndTime, [TriggerTime] = @TriggerTime WHERE [Id] = @Id";
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Clear();
@@ -230,6 +233,7 @@ namespace TaskingSolutions.Data.DataAccess
             cmd.Parameters.Add(Parameter("@JobId", SqlDbType.Int, item.JobId));
             cmd.Parameters.Add(Parameter("@StartTime", SqlDbType.DateTime2, item.StartTime));
             cmd.Parameters.Add(Parameter("@EndTime", SqlDbType.DateTime2, item.EndTime));
+            cmd.Parameters.Add(Parameter("@TriggerTime", SqlDbType.DateTime2, item.TriggerTime));
 
             cmd.ExecuteNonQuery();
         }
